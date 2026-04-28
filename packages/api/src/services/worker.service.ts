@@ -3,6 +3,7 @@ import { AppError } from './AppError.js'
 import { formatWorker } from '../models/worker.model.js'
 import type { CreateWorkerBody, UpdateWorkerBody } from '../interfaces/index.js'
 import { publishEvent } from './webhook.service.js'
+import { appEvents } from '../events/app-events.js'
 
 const workerInclude = { category: true, curator: true } as const
 
@@ -261,18 +262,21 @@ export async function getWorker(id: string) {
 export async function createWorker(data: CreateWorkerBody, curatorId: string) {
   const worker = await db.worker.create({ data: { ...data, curatorId } as any, include: workerInclude })
   publishEvent('worker.created', { worker: formatWorker(worker) }).catch(() => {})
+  appEvents.emit('worker.created', { workerId: worker.id, curatorId })
   return formatWorker(worker)
 }
 
 export async function updateWorker(id: string, data: UpdateWorkerBody) {
   const worker = await db.worker.update({ where: { id }, data: data as any, include: workerInclude })
   publishEvent('worker.updated', { worker: formatWorker(worker) }).catch(() => {})
+  appEvents.emit('worker.updated', { workerId: id, curatorId: worker.curatorId })
   return formatWorker(worker)
 }
 
 export async function deleteWorker(id: string) {
   await db.worker.delete({ where: { id } })
   publishEvent('worker.deleted', { workerId: id }).catch(() => {})
+  appEvents.emit('worker.deleted', { workerId: id })
 }
 
 export async function toggleWorker(id: string) {
@@ -283,5 +287,6 @@ export async function toggleWorker(id: string) {
     data: { isActive: !worker.isActive },
     include: workerInclude,
   })
+  appEvents.emit('worker.toggled', { workerId: id, isActive: updated.isActive })
   return formatWorker(updated)
 }

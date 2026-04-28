@@ -5,6 +5,7 @@ import passport from './config/passport.js'
 import { redis, cacheMetrics } from './config/redis.js'
 import { db } from './db.js'
 import { requestLogger } from './middleware/requestLogger.js'
+import { registerEventHandlers } from './events/index.js'
 import authRoutes from './routes/auth.js'
 import categoryRoutes from './routes/categories.js'
 import workerRoutes from './routes/workers.js'
@@ -24,6 +25,9 @@ import { versionMiddleware, deprecationWarning } from './middleware/version.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 const app = express()
+
+// Register application event handlers
+registerEventHandlers()
 
 // Connect Redis (non-blocking — app starts even if Redis is down)
 redis.connect().catch(() => {})
