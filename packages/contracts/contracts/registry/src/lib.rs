@@ -601,7 +601,7 @@ fn role_to_id(role: &Symbol) -> u64 {
         let pauser_role = Self::role_symbol(&env, ROLE_PAUSER_CACHED);
         Self::require_role(&env, &pauser_role, &admin);
         env.storage().instance().set(&DataKey::Paused, &true);
-        env.events().publish((symbol_short!("Paused"), admin), ());
+        env.events().publish((symbol_short!("ContractPaused"), admin), ());
     }
 
     /// Unpause the contract, re-enabling all state-mutating operations.
@@ -613,12 +613,12 @@ fn role_to_id(role: &Symbol) -> u64 {
     /// Panics with `"Missing role"` if `admin` does not hold `ROLE_PAUSER`.
     ///
     /// # Events
-    /// Emits `("Unpaused", admin)`.
+    /// Emits `("ContractUnpaused", admin)`.
     pub fn unpause(env: Env, admin: Address) {
         let pauser_role = Self::role_symbol(&env, ROLE_PAUSER_CACHED);
         Self::require_role(&env, &pauser_role, &admin);
         env.storage().instance().set(&DataKey::Paused, &false);
-        env.events().publish((symbol_short!("Unpaused"), admin), ());
+        env.events().publish((symbol_short!("ContractUnpaused"), admin), ());
     }
 
     /// Returns `true` if the contract is currently paused.
