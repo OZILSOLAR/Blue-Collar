@@ -766,6 +766,8 @@ fn role_to_id(role: &Symbol) -> u64 {
         let key = DataKey::Worker(id.clone());
         env.storage().persistent().set(&key, &worker);
         env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Emit Worker TTL extended event
+        env.events().publish((symbol_short!("WorkerTTLExtended"), id), ());
 
         let list_key = DataKey::WorkerList;
         let mut list: Vec<Symbol> = env
@@ -776,9 +778,11 @@ fn role_to_id(role: &Symbol) -> u64 {
         list.push_back(id.clone());
         env.storage().persistent().set(&list_key, &list);
         env.storage().persistent().extend_ttl(&list_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Emit WorkerList TTL extended event
+        env.events().publish((symbol_short!("WorkerListTTLExtended"), ()), ());
 
         env.events().publish(
-            (symbol_short!("WrkReg"), id),
+            (symbol_short!("WorkerRegistered"), id),
             (owner, category),
         );
     }
@@ -812,7 +816,7 @@ fn role_to_id(role: &Symbol) -> u64 {
         let new_status = worker.is_active;
         env.storage().persistent().set(&DataKey::Worker(id.clone()), &worker);
 
-        env.events().publish((symbol_short!("WrkTgl"), id), new_status);
+        env.events().publish((symbol_short!("WorkerToggled"), id), new_status);
     }
 
     /// Update a worker's name, category, location hash, and contact hash. Owner only.
@@ -1105,6 +1109,8 @@ fn role_to_id(role: &Symbol) -> u64 {
         worker.avg_rating = avg_rating;
         env.storage().persistent().set(&DataKey::Worker(id.clone()), &worker);
         env.storage().persistent().extend_ttl(&DataKey::Worker(id.clone()), TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Emit Worker TTL extended event
+        env.events().publish((symbol_short!("WorkerTTLExtended"), id), ());
 
         env.events().publish((symbol_short!("RevUpd"), id), (review_count, avg_rating));
     }
@@ -1190,6 +1196,8 @@ fn role_to_id(role: &Symbol) -> u64 {
 
         env.storage().persistent().set(&DataKey::Worker(id.clone()), &worker);
         env.storage().persistent().extend_ttl(&DataKey::Worker(id.clone()), TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Emit Worker TTL extended event
+        env.events().publish((symbol_short!("WorkerTTLExtended"), id), ());
 
         env.events().publish((symbol_short!("SubRnw"), id), new_expires_at);
     }
@@ -1471,7 +1479,9 @@ fn role_to_id(role: &Symbol) -> u64 {
             };
 
             env.storage().persistent().set(&key, &worker);
-            env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Emit Worker TTL extended event
+        env.events().publish((symbol_short!("WorkerTTLExtended"), id), ());
             list.push_back(id.clone());
 
             env.events().publish(
@@ -1484,6 +1494,8 @@ fn role_to_id(role: &Symbol) -> u64 {
 
         env.storage().persistent().set(&list_key, &list);
         env.storage().persistent().extend_ttl(&list_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Emit WorkerList TTL extended event
+        env.events().publish((symbol_short!("WorkerListTTLExtended"), ()), ());
 
         results
     }
