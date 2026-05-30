@@ -60,10 +60,11 @@ model User {
   verificationRequests    VerificationRequest[] @relation("VerificationRequests")
   verificationReviews     VerificationRequest[] @relation("VerificationReviews")
   auditLogs               AuditLog[]
-  referralsMade           Referral[]            @relation("ReferralsMade")
-  referralUsed            Referral?             @relation("ReferralUsed")
-  jobs                    Job[]                 @relation("JobsPosted")
-  refreshTokens           RefreshToken[]
+  referralsMade               Referral[]            @relation("ReferralsMade")
+  referralUsed                Referral?             @relation("ReferralUsed")
+  jobs                        Job[]                 @relation("JobsPosted")
+  refreshTokens               RefreshToken[]
+  notificationPreferences     NotificationPreferences?
 }
 
 model Category {
