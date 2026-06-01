@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { userSerializer } from '../serializers/user.serializer.js'
 import { categorySerializer } from '../serializers/category.serializer.js'
 import { workerSerializer } from '../serializers/worker.serializer.js'
+import { serializeError } from '../serializers/error.serializer.js'
+import { AppError, ErrorCode } from '../utils/AppError.js'
 
 const mockUser: any = {
   id: 'u1', email: 'a@b.com', firstName: 'Jane', lastName: 'Doe',
@@ -59,5 +61,67 @@ describe('WorkerSerializer', () => {
     expect(result.category).toMatchObject({ id: 'c1', name: 'Plumber' })
     expect(result.curator).not.toHaveProperty('password')
     expect(result.curator?.email).toBe('a@b.com')
+  })
+})
+
+describe('ErrorSerializer', () => {
+  it('serializes an operational AppError', () => {
+    const err = new AppError('Not found', 404, true, ErrorCode.NOT_FOUND)
+    const { statusCode, body } = serializeError(err)
+    expect(statusCode).toBe(404)
+    expect(body.status).toBe('error')
+    expect(body.message).toBe('Not found')
+    expect(body.errorCode).toBe(ErrorCode.NOT_FOUND)
+    expect(body.code).toBe(404)
+  })
+
+  it('returns 500 for a non-operational AppError', () => {
+    const err = new AppError('Crash', 500, false, ErrorCode.INTERNAL_ERROR)
+    const { statusCode, body } = serializeError(err)
+    expect(statusCode).toBe(500)
+    expect(body.message).toBe('Internal Server Error')
+    expect(body.errorCode).toBe(ErrorCode.INTERNAL_ERROR)
+  })
+
+  it('returns 500 for an unknown error', () => {
+    const { statusCode, body } = serializeError(new Error('boom'))
+    expect(statusCode).toBe(500)
+    expect(body.status).toBe('error')
+    expect(body.errorCode).toBe(ErrorCode.INTERNAL_ERROR)
+  })
+
+  it('maps Prisma P2002 to 409 CONFLICT', () => {
+    const prismaErr = { code: 'P2002', meta: {} }
+    const { statusCode, body } = serializeError(prismaErr)
+    expect(statusCode).toBe(409)
+    expect(body.errorCode).toBe(ErrorCode.CONFLICT)
+  })
+
+  it('maps Prisma P2025 to 404 NOT_FOUND', () => {
+    const prismaErr = { code: 'P2025' }
+    const { statusCode, body } = serializeError(prismaErr)
+    expect(statusCode).toBe(404)
+    expect(body.errorCode).toBe(ErrorCode.NOT_FOUND)
+  })
+
+  it('maps Prisma P2003 to 400 VALIDATION_ERROR', () => {
+    const prismaErr = { code: 'P2003' }
+    const { statusCode, body } = serializeError(prismaErr)
+    expect(statusCode).toBe(400)
+    expect(body.errorCode).toBe(ErrorCode.VALIDATION_ERROR)
+  })
+
+  it('maps unknown Prisma error to 500', () => {
+    const prismaErr = { code: 'P9999' }
+    const { statusCode, body } = serializeError(prismaErr)
+    expect(statusCode).toBe(500)
+    expect(body.errorCode).toBe(ErrorCode.INTERNAL_ERROR)
+  })
+
+  it('returns 403 for CORS errors', () => {
+    const corsErr = new Error('CORS: origin not allowed')
+    const { statusCode, body } = serializeError(corsErr)
+    expect(statusCode).toBe(403)
+    expect(body.errorCode).toBe(ErrorCode.FORBIDDEN)
   })
 })
