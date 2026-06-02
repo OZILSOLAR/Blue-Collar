@@ -1,12 +1,13 @@
 import { z } from 'zod'
+import { emailField, nameField, phoneField } from './shared.js'
 
 // POST /workers
 export const createWorkerRules = z
   .object({
-    name: z.string().min(1),
+    name: nameField,
     categoryId: z.string().min(1),
-    phone: z.string().optional(),
-    email: z.string().email().optional(),
+    phone: phoneField,
+    email: emailField.optional(),
     bio: z.string().optional(),
     walletAddress: z.string().optional(),
   })
@@ -17,10 +18,10 @@ export const createWorkerRules = z
 
 // PUT /workers/:id — all fields optional
 export const updateWorkerRules = z.object({
-  name: z.string().min(1).optional(),
+  name: nameField.optional(),
   categoryId: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
+  phone: phoneField,
+  email: emailField.optional(),
   bio: z.string().optional(),
   walletAddress: z.string().optional(),
 })

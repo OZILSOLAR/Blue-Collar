@@ -5,6 +5,7 @@
  *   import { loginRules, createWorkerRules } from '../validations/index.js'
  *   router.post('/login', validate(loginRules), login)
  */
+export * from './shared.js'
 export * from './auth.js'
 export * from './worker.js'
 export * from './admin.js'
