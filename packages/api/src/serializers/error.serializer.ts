@@ -1,5 +1,6 @@
 import { AppError, ErrorCode } from '../utils/AppError.js'
 import { getTraceId } from '../monitoring/tracing.js'
+import { ErrorMessages, HttpStatus } from '../constants/index.js'
 
 export interface ErrorResponse {
   status: 'error'
@@ -28,10 +29,10 @@ function isPrismaError(err: unknown): err is PrismaClientKnownRequestError {
 
 function mapPrismaError(err: PrismaClientKnownRequestError): { statusCode: number; message: string; errorCode: ErrorCode } {
   switch (err.code) {
-    case 'P2002': return { statusCode: 409, message: 'A record with that value already exists', errorCode: ErrorCode.CONFLICT }
-    case 'P2025': return { statusCode: 404, message: 'Record not found', errorCode: ErrorCode.NOT_FOUND }
-    case 'P2003': return { statusCode: 400, message: 'Related record not found', errorCode: ErrorCode.VALIDATION_ERROR }
-    default:      return { statusCode: 500, message: 'Database error', errorCode: ErrorCode.INTERNAL_ERROR }
+    case 'P2002': return { statusCode: HttpStatus.CONFLICT, message: ErrorMessages.DB_DUPLICATE_VALUE, errorCode: ErrorCode.CONFLICT }
+    case 'P2025': return { statusCode: HttpStatus.NOT_FOUND, message: ErrorMessages.DB_RECORD_NOT_FOUND, errorCode: ErrorCode.NOT_FOUND }
+    case 'P2003': return { statusCode: HttpStatus.BAD_REQUEST, message: ErrorMessages.DB_RELATED_NOT_FOUND, errorCode: ErrorCode.VALIDATION_ERROR }
+    default:      return { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, message: ErrorMessages.DB_ERROR, errorCode: ErrorCode.INTERNAL_ERROR }
   }
 }
 
@@ -45,8 +46,8 @@ export function serializeError(err: unknown): SerializedError {
 
   if (err instanceof Error && err.message.startsWith('CORS:')) {
     return {
-      statusCode: 403,
-      body: { status: 'error', message: 'Forbidden: origin not allowed', code: 403, errorCode: ErrorCode.FORBIDDEN },
+      statusCode: HttpStatus.FORBIDDEN,
+      body: { status: 'error', message: ErrorMessages.FORBIDDEN, code: HttpStatus.FORBIDDEN, errorCode: ErrorCode.FORBIDDEN },
     }
   }
 
@@ -65,11 +66,11 @@ export function serializeError(err: unknown): SerializedError {
   const error = err instanceof Error ? err : new Error(String(err))
   const body: ErrorResponse = {
     status: 'error',
-    message: 'Internal Server Error',
-    code: 500,
+    message: ErrorMessages.INTERNAL_SERVER_ERROR,
+    code: HttpStatus.INTERNAL_SERVER_ERROR,
     errorCode: ErrorCode.INTERNAL_ERROR,
     traceId,
     ...(process.env.NODE_ENV === 'development' && { stack: error.stack, originalMessage: error.message }),
   }
-  return { statusCode: 500, body }
+  return { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, body }
 }

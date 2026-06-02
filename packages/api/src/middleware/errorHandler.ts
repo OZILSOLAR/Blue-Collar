@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import { AppError, ErrorCode } from '../utils/AppError.js'
 import { logger } from '../config/logger.js'
 import { serializeError } from '../serializers/error.serializer.js'
+import { ErrorMessages } from '../constants/index.js'
 
 /**
  * Global error handling middleware for Express.
@@ -33,5 +34,5 @@ export function errorHandler(
  * Register after all route handlers but before errorHandler.
  */
 export function notFoundHandler(req: Request, _res: Response, next: NextFunction) {
-  next(new AppError(`Route ${req.method} ${req.url} not found`, 404, true, ErrorCode.NOT_FOUND))
+  next(new AppError(ErrorMessages.ROUTE_NOT_FOUND(req.method, req.url), 404, true, ErrorCode.NOT_FOUND))
 }
