@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import FormField from "@/components/FormField";
 import ImageUpload from "@/components/ImageUpload";
 import { cn } from "@/lib/utils";
@@ -32,12 +32,87 @@ export const workerSchema = z.object({
 
 export type WorkerFormInput = z.infer<typeof workerSchema>;
 
+// ─── Profile completion ──────────────────────────────────────────────────────
+
+interface CompletionStep {
+  key: string;
+  label: string;
+  done: boolean;
+}
+
+function useProfileCompletion(
+  values: Partial<WorkerFormInput>,
+  hasAvatar: boolean,
+  portfolioCount: number,
+  hasAvailability: boolean,
+): { steps: CompletionStep[]; percentage: number } {
+  return useMemo(() => {
+    const steps: CompletionStep[] = [
+      { key: "name", label: "Full name", done: (values.name?.length ?? 0) >= 2 },
+      { key: "category", label: "Category", done: !!values.categoryId },
+      { key: "bio", label: "Bio", done: (values.bio?.length ?? 0) > 0 },
+      { key: "avatar", label: "Profile photo", done: hasAvatar },
+      { key: "phone", label: "Phone number", done: !!values.phone },
+      { key: "email", label: "Email", done: !!values.email },
+      { key: "wallet", label: "Wallet address", done: !!values.walletAddress },
+      { key: "portfolio", label: "Portfolio images", done: portfolioCount > 0 },
+      { key: "availability", label: "Availability", done: hasAvailability },
+    ];
+    const done = steps.filter((s) => s.done).length;
+    return { steps, percentage: Math.round((done / steps.length) * 100) };
+  }, [values, hasAvatar, portfolioCount, hasAvailability]);
+}
+
+function ProfileCompletionBar({
+  steps,
+  percentage,
+}: {
+  steps: CompletionStep[];
+  percentage: number;
+}) {
+  const color =
+    percentage === 100 ? "bg-green-500" : percentage >= 60 ? "bg-blue-500" : "bg-amber-500";
+
+  return (
+    <div className="rounded-xl border bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">Profile Completion</h3>
+        <span className={cn("text-sm font-bold", percentage === 100 ? "text-green-600" : "text-gray-700")}>
+          {percentage}%
+        </span>
+      </div>
+      <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+        <div
+          className={cn("h-full rounded-full transition-all duration-500", color)}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+        {steps.map((step) => (
+          <div key={step.key} className="flex items-center gap-1.5 text-xs">
+            <CheckCircle2
+              size={13}
+              className={step.done ? "text-green-500" : "text-gray-300"}
+            />
+            <span className={step.done ? "text-gray-700" : "text-gray-400"}>
+              {step.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export { useProfileCompletion, ProfileCompletionBar };
+
 interface Props {
   defaultValues?: Partial<WorkerFormInput>;
   existingAvatar?: string | null;
   onSubmit: (data: WorkerFormInput, imageFile: File | null) => Promise<void>;
   submitLabel?: string;
   isSubmitting?: boolean;
+  onChange?: (values: WorkerFormInput) => void;
 }
 
 export default function WorkerForm({
@@ -46,6 +121,7 @@ export default function WorkerForm({
   onSubmit,
   submitLabel = "Save",
   isSubmitting = false,
+  onChange,
 }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -60,6 +136,12 @@ export default function WorkerForm({
     defaultValues,
     mode: "onChange",
   });
+
+  const watchedValues = watch();
+
+  useEffect(() => {
+    onChange?.(watchedValues);
+  }, [watchedValues, onChange]);
 
   useEffect(() => {
     getCategories()

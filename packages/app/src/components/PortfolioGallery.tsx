@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { GripVertical, Plus, Trash2, X } from "lucide-react";
+import { GripVertical, Plus, Trash2, X, ImageIcon, AlertCircle } from "lucide-react";
 import ImageLightbox from "@/components/ImageLightbox";
 
 export interface PortfolioImage {
@@ -10,9 +10,13 @@ export interface PortfolioImage {
   caption?: string;
 }
 
+const MAX_IMAGES = 20;
+const MAX_FILE_SIZE_MB = 5;
+
 interface Props {
   images: PortfolioImage[];
   editable?: boolean;
+  maxImages?: number;
   onAdd?: (files: File[]) => void;
   onRemove?: (id: string) => void;
   onReorder?: (images: PortfolioImage[]) => void;
@@ -22,6 +26,7 @@ interface Props {
 export default function PortfolioGallery({
   images,
   editable = false,
+  maxImages = MAX_IMAGES,
   onAdd,
   onRemove,
   onReorder,
@@ -31,12 +36,44 @@ export default function PortfolioGallery({
   const [editingCaption, setEditingCaption] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  const remaining = maxImages - images.length;
+
+  const validateAndAdd = (files: File[]) => {
+    setUploadError(null);
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      setUploadError("Only image files are accepted.");
+      return;
+    }
+    const oversized = imageFiles.filter((f) => f.size > MAX_FILE_SIZE_MB * 1024 * 1024);
+    if (oversized.length > 0) {
+      setUploadError(`${oversized.length} file(s) exceed ${MAX_FILE_SIZE_MB}MB limit.`);
+      return;
+    }
+    const allowed = imageFiles.slice(0, remaining);
+    if (allowed.length < imageFiles.length) {
+      setUploadError(`Only ${remaining} more image(s) can be added (max ${maxImages}).`);
+    }
+    if (allowed.length > 0) onAdd?.(allowed);
+  };
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    if (files.length && onAdd) onAdd(files);
+    if (files.length) validateAndAdd(files);
     e.target.value = "";
+  };
+
+  const handleDropZone = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    if (!editable || remaining <= 0) return;
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) validateAndAdd(files);
   };
 
   const handleDragStart = (i: number) => setDragIndex(i);
@@ -70,7 +107,37 @@ export default function PortfolioGallery({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* Image counter & upload error */}
+      {editable && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <ImageIcon size={13} />
+            <span>
+              {images.length}/{maxImages} images
+            </span>
+          </div>
+          {uploadError && (
+            <div className="flex items-center gap-1.5 text-xs text-amber-600">
+              <AlertCircle size={13} />
+              <span>{uploadError}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div
+        ref={dropZoneRef}
+        onDragOver={(e) => {
+          if (!editable) return;
+          e.preventDefault();
+          setIsDraggingOver(true);
+        }}
+        onDragLeave={() => setIsDraggingOver(false)}
+        onDrop={handleDropZone}
+        className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${
+          isDraggingOver ? "rounded-xl ring-2 ring-blue-400 ring-offset-2" : ""
+        }`}
+      >
         {images.map((img, i) => (
           <div
             key={img.id}
@@ -143,7 +210,7 @@ export default function PortfolioGallery({
         ))}
 
         {/* Add button */}
-        {editable && (
+        {editable && remaining > 0 && (
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
@@ -151,6 +218,7 @@ export default function PortfolioGallery({
           >
             <Plus size={24} />
             <span className="text-xs font-medium">Add photos</span>
+            <span className="text-[10px] text-gray-300">{remaining} remaining</span>
           </button>
         )}
       </div>

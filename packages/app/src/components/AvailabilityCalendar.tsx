@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { ChevronLeft, ChevronRight, Clock, Plus, Trash2 } from "lucide-react";
 
-interface Slot {
+export interface Slot {
   dayOfWeek: number; // 0 = Sun … 6 = Sat
   startTime: string;
   endTime: string;
@@ -11,13 +11,24 @@ interface Slot {
 
 interface Props {
   availability: Slot[];
+  editable?: boolean;
+  onAdd?: (slot: Slot) => void;
+  onRemove?: (dayOfWeek: number) => void;
+  onBulkSet?: (slots: Slot[]) => void;
 }
 
 const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${h.toString().padStart(2, "0")}:${m}`;
+});
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() &&
@@ -31,7 +42,13 @@ function inRange(date: Date, start: Date | null, end: Date | null) {
   return t > start.getTime() && t < end.getTime();
 }
 
-export default function AvailabilityCalendar({ availability }: Props) {
+export default function AvailabilityCalendar({
+  availability,
+  editable = false,
+  onAdd,
+  onRemove,
+  onBulkSet,
+}: Props) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = new Date();
 
@@ -40,11 +57,43 @@ export default function AvailabilityCalendar({ availability }: Props) {
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
 
+  // Editable mode state
+  const [showSlotEditor, setShowSlotEditor] = useState(false);
+  const [bulkDays, setBulkDays] = useState<number[]>([]);
+  const [bulkStart, setBulkStart] = useState("09:00");
+  const [bulkEnd, setBulkEnd] = useState("17:00");
+
   const availableDays = useMemo(() => new Set(availability.map((s) => s.dayOfWeek)), [availability]);
   const slotMap = useMemo(
     () => Object.fromEntries(availability.map((s) => [s.dayOfWeek, s])),
     [availability]
   );
+
+  const toggleBulkDay = useCallback((day: number) => {
+    setBulkDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  }, []);
+
+  const handleBulkApply = useCallback(() => {
+    if (bulkDays.length === 0 || !onBulkSet) return;
+    const slots = bulkDays.map((dayOfWeek) => ({
+      dayOfWeek,
+      startTime: bulkStart,
+      endTime: bulkEnd,
+    }));
+    onBulkSet(slots);
+    setBulkDays([]);
+    setShowSlotEditor(false);
+  }, [bulkDays, bulkStart, bulkEnd, onBulkSet]);
+
+  const handleSelectWeekdays = useCallback(() => {
+    setBulkDays([1, 2, 3, 4, 5]);
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setBulkDays([0, 1, 2, 3, 4, 5, 6]);
+  }, []);
 
   // Build calendar grid
   const firstDay = new Date(year, month, 1).getDay();
@@ -166,8 +215,147 @@ export default function AvailabilityCalendar({ availability }: Props) {
         </span>
       </div>
 
-      {/* Selection summary */}
-      {rangeStart && (
+      {/* Slot editor for editable mode */}
+      {editable && (
+        <div className="mt-4 space-y-3">
+          {/* Current slots list */}
+          {availability.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-gray-600">Current schedule</p>
+              {availability
+                .slice()
+                .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+                .map((slot) => (
+                  <div
+                    key={slot.dayOfWeek}
+                    className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium text-gray-700 w-24">
+                        {DAY_FULL[slot.dayOfWeek]}
+                      </span>
+                      <span className="flex items-center gap-1 text-gray-500">
+                        <Clock size={12} />
+                        {slot.startTime} – {slot.endTime}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => onRemove?.(slot.dayOfWeek)}
+                      className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                      aria-label={`Remove ${DAY_FULL[slot.dayOfWeek]}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {/* Bulk set toggle */}
+          {!showSlotEditor ? (
+            <button
+              onClick={() => setShowSlotEditor(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors w-full justify-center"
+            >
+              <Plus size={14} />
+              Set availability
+            </button>
+          ) : (
+            <div className="rounded-lg border bg-blue-50/50 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-700">
+                Bulk set availability
+              </p>
+
+              {/* Day selector */}
+              <div>
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Select days</span>
+                  <button
+                    type="button"
+                    onClick={handleSelectWeekdays}
+                    className="text-[10px] text-blue-500 hover:underline"
+                  >
+                    Weekdays
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSelectAll}
+                    className="text-[10px] text-blue-500 hover:underline"
+                  >
+                    All
+                  </button>
+                </div>
+                <div className="flex gap-1.5">
+                  {DAY_LABELS.map((label, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleBulkDay(i)}
+                      className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+                        bulkDays.includes(i)
+                          ? "bg-blue-600 text-white"
+                          : "bg-white border text-gray-600 hover:border-blue-400"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Time range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">Start time</label>
+                  <select
+                    value={bulkStart}
+                    onChange={(e) => setBulkStart(e.target.value)}
+                    className="w-full rounded-lg border bg-white px-2 py-1.5 text-sm"
+                  >
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">End time</label>
+                  <select
+                    value={bulkEnd}
+                    onChange={(e) => setBulkEnd(e.target.value)}
+                    className="w-full rounded-lg border bg-white px-2 py-1.5 text-sm"
+                  >
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleBulkApply}
+                  disabled={bulkDays.length === 0}
+                  className="flex-1 rounded-lg bg-blue-600 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  Apply to {bulkDays.length} day{bulkDays.length !== 1 ? "s" : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowSlotEditor(false); setBulkDays([]); }}
+                  className="rounded-lg border bg-white px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selection summary (read-only mode) */}
+      {!editable && rangeStart && (
         <div className="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800">
           {rangeEnd ? (
             <p>
@@ -198,7 +386,7 @@ export default function AvailabilityCalendar({ availability }: Props) {
         </div>
       )}
 
-      {availability.length === 0 && (
+      {availability.length === 0 && !editable && (
         <p className="mt-4 text-center text-xs text-gray-400 italic">
           No availability set for this worker.
         </p>
