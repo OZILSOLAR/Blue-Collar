@@ -35,6 +35,30 @@ export interface EscrowResult {
   status: 'pending'
 }
 
+// ── Multi-sig escrow types ────────────────────────────────────────────────────
+
+export interface MultiSigEscrowParams {
+  from: string
+  to: string
+  amount: number
+  expiryDate: Date
+  /** Addresses authorised to approve release (must be non-empty). */
+  signers: string[]
+  /** Number of approvals required (1 ≤ threshold ≤ signers.length). */
+  threshold: number
+}
+
+export interface MultiSigEscrowResult {
+  from: string
+  to: string
+  amount: number
+  expiryDate: Date
+  signers: string[]
+  threshold: number
+  approvals: string[]
+  status: 'pending'
+}
+
 // ── Standalone helpers (kept for backward-compat & Stryker coverage) ─────────
 
 export function calculateFee(amount: number, fee_bps: number): number {
@@ -80,6 +104,23 @@ export function createEscrow({ from, to, amount, expiryDate }: EscrowParams): Es
     throw new AppError('Escrow amount must be greater than 0', 400)
   }
   return { from, to, amount, expiryDate, status: 'pending' }
+}
+
+export function createMultiSigEscrow(params: MultiSigEscrowParams): MultiSigEscrowResult {
+  const { from, to, amount, expiryDate, signers, threshold } = params
+  if (expiryDate <= new Date()) {
+    throw new AppError('Escrow expiry must be in the future', 400)
+  }
+  if (amount <= 0) {
+    throw new AppError('Escrow amount must be greater than 0', 400)
+  }
+  if (signers.length === 0) {
+    throw new AppError('At least one signer is required', 400)
+  }
+  if (threshold < 1 || threshold > signers.length) {
+    throw new AppError('threshold must be between 1 and signers.length', 400)
+  }
+  return { from, to, amount, expiryDate, signers, threshold, approvals: [], status: 'pending' }
 }
 
 // ── PaymentService class ──────────────────────────────────────────────────────
@@ -150,6 +191,14 @@ export class PaymentService {
       throw new AppError('Escrow amount must be greater than 0', 400)
     }
     return { from, to, amount, expiryDate, status: 'pending' }
+  }
+
+  /**
+   * Create a multi-signature escrow requiring threshold approvals before release.
+   * Validates all inputs and returns the initial escrow state with an empty approvals list.
+   */
+  createMultiSigEscrow(params: MultiSigEscrowParams): MultiSigEscrowResult {
+    return createMultiSigEscrow(params)
   }
 }
 

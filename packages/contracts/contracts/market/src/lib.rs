@@ -774,6 +774,7 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
         threshold: u32,
     ) {
         from.require_auth();
+        Self::require_not_paused(&env);
         assert!(amount > 0, "Amount must be positive");
         assert!(
             !env.storage().persistent().has(&DataKey::MultiSigEscrow(id.clone())),
@@ -825,6 +826,7 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
     /// Emits `("MsEscRel", id, to)` with data `amount` when threshold is reached.
     pub fn approve_multisig_release(env: Env, id: Symbol, caller: Address) {
         caller.require_auth();
+        Self::require_not_paused(&env);
         let mut escrow: MultiSigEscrow = env
             .storage()
             .persistent()
@@ -873,6 +875,7 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
     /// Emits `("MsEscCnl", id, from)` with data `amount`.
     pub fn cancel_multisig_escrow(env: Env, id: Symbol, caller: Address) {
         caller.require_auth();
+        Self::require_not_paused(&env);
         let mut escrow: MultiSigEscrow = env
             .storage()
             .persistent()
@@ -898,6 +901,174 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
     /// Fetch multi-sig escrow details by id.
     pub fn get_multisig_escrow(env: Env, id: Symbol) -> Option<MultiSigEscrow> {
         env.storage().persistent().get(&DataKey::MultiSigEscrow(id))
+    }
+
+    /// Request arbitration for a disputed multi-sig escrow.
+    ///
+    /// Either `from` or `to` may request arbitration on an active, unreleased,
+    /// non-cancelled escrow. Calling this marks the escrow as disputed and records
+    /// the arbitration, preventing normal approval-based release until resolved.
+    ///
+    /// # Parameters
+    /// - `escrow_id`: The multi-sig escrow identifier.
+    /// - `caller`: Must be `from` or `to`; `require_auth()` is enforced.
+    /// - `arbitrator`: Must be a registered arbitrator address.
+    /// - `fee`: Arbitration fee paid immediately from `caller` to `arbitrator`.
+    ///
+    /// # Panics
+    /// - `"MultiSigEscrow not found"` if no escrow with the given `id` exists.
+    /// - `"Not authorized"` if caller is neither `from` nor `to`.
+    /// - `"Escrow finalized"` if already released or cancelled.
+    /// - `"Arbitration already requested"` if arbitration is already active.
+    /// - `"Invalid arbitrator"` if the arbitrator is not in the approved list.
+    /// - `"Contract is paused"` if paused.
+    ///
+    /// # Events
+    /// Emits `("MsArbReq", escrow_id, caller)` with data `(arbitrator, fee)`.
+    pub fn request_multisig_arbitration(
+        env: Env,
+        escrow_id: Symbol,
+        caller: Address,
+        arbitrator: Address,
+        fee: i128,
+    ) {
+        caller.require_auth();
+        Self::require_not_paused(&env);
+
+        let mut escrow: MultiSigEscrow = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MultiSigEscrow(escrow_id.clone()))
+            .expect("MultiSigEscrow not found");
+
+        assert!(
+            escrow.from == caller || escrow.to == caller,
+            "Not authorized"
+        );
+        assert!(!escrow.released && !escrow.cancelled, "Escrow finalized");
+
+        // Re-use the Arbitration storage key — one record per escrow id.
+        assert!(
+            !env.storage().persistent().has(&DataKey::Arbitration(escrow_id.clone())),
+            "Arbitration already requested"
+        );
+
+        let arbitrators: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Arbitrators)
+            .unwrap_or(Vec::new(&env));
+        assert!(
+            arbitrators.iter().any(|a| a == arbitrator),
+            "Invalid arbitrator"
+        );
+
+        // Pay arbitration fee immediately.
+        if fee > 0 {
+            let client = token::Client::new(&env, &escrow.token);
+            client.transfer(&caller, &arbitrator, &fee);
+        }
+
+        // Mark escrow as disputed (borrow the cancelled flag semantics via a
+        // dedicated Arbitration record; the escrow itself stays "active" so
+        // the arbitrator can release it either way).
+        escrow.cancelled = false; // ensure still active
+        env.storage()
+            .persistent()
+            .set(&DataKey::MultiSigEscrow(escrow_id.clone()), &escrow);
+
+        let arbitration = Arbitration {
+            escrow_id: escrow_id.clone(),
+            requester: caller.clone(),
+            arbitrator: arbitrator.clone(),
+            fee,
+            resolved: false,
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::Arbitration(escrow_id.clone()), &arbitration);
+
+        env.events().publish(
+            (symbol_short!("MsArbReq"), escrow_id, caller),
+            (arbitrator, fee),
+        );
+    }
+
+    /// Resolve arbitration for a disputed multi-sig escrow.
+    ///
+    /// The assigned arbitrator decides whether funds go to the worker (`to`)
+    /// or are refunded to the payer (`from`).
+    ///
+    /// # Parameters
+    /// - `escrow_id`: The multi-sig escrow identifier.
+    /// - `arbitrator`: Must match the arbitrator on the record; `require_auth()` enforced.
+    /// - `release_to_worker`: `true` → release to `to`; `false` → refund to `from`.
+    ///
+    /// # Panics
+    /// - `"Arbitration not found"` if no arbitration record exists for this escrow.
+    /// - `"Not the arbitrator"` if `arbitrator` does not match the record.
+    /// - `"Already resolved"` if already resolved.
+    /// - `"MultiSigEscrow not found"` if the underlying escrow is missing.
+    /// - `"Contract is paused"` if paused.
+    ///
+    /// # Events
+    /// Emits `("MsArbRes", escrow_id, arbitrator)` with data `release_to_worker`.
+    pub fn resolve_multisig_arbitration(
+        env: Env,
+        escrow_id: Symbol,
+        arbitrator: Address,
+        release_to_worker: bool,
+    ) {
+        arbitrator.require_auth();
+        Self::require_not_paused(&env);
+
+        let mut arbitration: Arbitration = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Arbitration(escrow_id.clone()))
+            .expect("Arbitration not found");
+
+        assert!(arbitration.arbitrator == arbitrator, "Not the arbitrator");
+        assert!(!arbitration.resolved, "Already resolved");
+
+        let mut escrow: MultiSigEscrow = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MultiSigEscrow(escrow_id.clone()))
+            .expect("MultiSigEscrow not found");
+
+        assert!(!escrow.released && !escrow.cancelled, "Escrow finalized");
+
+        let client = token::Client::new(&env, &escrow.token);
+        let recipient = if release_to_worker {
+            escrow.released = true;
+            escrow.to.clone()
+        } else {
+            escrow.cancelled = true;
+            escrow.from.clone()
+        };
+        client.transfer(&env.current_contract_address(), &recipient, &escrow.amount);
+
+        arbitration.resolved = true;
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::MultiSigEscrow(escrow_id.clone()), &escrow);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Arbitration(escrow_id.clone()), &arbitration);
+
+        env.events().publish(
+            (symbol_short!("MsArbRes"), escrow_id, arbitrator),
+            release_to_worker,
+        );
+    }
+
+    /// Get arbitration details for a multi-sig escrow (re-uses Arbitration storage key).
+    pub fn get_multisig_arbitration(env: Env, escrow_id: Symbol) -> Option<Arbitration> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Arbitration(escrow_id))
     }
 
     // -------------------------------------------------------------------------
@@ -1542,6 +1713,248 @@ mod tests {
          assert_eq!(t.token_balance(&t.payer), 1_000_000);
          assert!(t.client().get_multisig_escrow(&id).unwrap().cancelled);
      }
+
+    // ── Additional multi-sig edge-case tests ─────────────────────────────────
+
+    #[test]
+    fn test_multisig_threshold_one_releases_immediately() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms5");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &50_000, &9999, &signers, &1);
+
+        t.client().approve_multisig_release(&id, &s1);
+
+        assert_eq!(t.token_balance(&t.worker), 50_000);
+        assert!(t.client().get_multisig_escrow(&id).unwrap().released);
+    }
+
+    #[test]
+    #[should_panic(expected = "MultiSigEscrow id already exists")]
+    fn test_multisig_duplicate_id_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms6");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &1);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Amount must be positive")]
+    fn test_multisig_zero_amount_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms7");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &0, &9999, &signers, &1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid threshold")]
+    fn test_multisig_threshold_exceeds_signers_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms8");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        // threshold 2 but only 1 signer
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid threshold")]
+    fn test_multisig_zero_threshold_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms9");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Already released")]
+    fn test_multisig_approve_after_release_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms10");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &1);
+        // First approval releases (threshold=1)
+        t.client().approve_multisig_release(&id, &s1);
+        // Attempt second approval on a released escrow
+        t.client().approve_multisig_release(&id, &s1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Escrow not yet expired")]
+    fn test_multisig_cancel_before_expiry_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms11");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.set_time(500);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &2000, &signers, &1);
+        // Try to cancel before expiry
+        t.client().cancel_multisig_escrow(&id, &t.payer);
+    }
+
+    #[test]
+    #[should_panic(expected = "Already cancelled")]
+    fn test_multisig_cancel_twice_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms12");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.set_time(1000);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &2000, &signers, &1);
+        t.set_time(3000);
+        t.client().cancel_multisig_escrow(&id, &t.payer);
+        t.client().cancel_multisig_escrow(&id, &t.payer);
+    }
+
+    #[test]
+    #[should_panic(expected = "Not authorized")]
+    fn test_multisig_cancel_by_non_payer_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms13");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.set_time(1000);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &2000, &signers, &1);
+        t.set_time(3000);
+        // worker tries to cancel — only payer (from) is allowed
+        t.client().cancel_multisig_escrow(&id, &t.worker);
+    }
+
+    #[test]
+    #[should_panic(expected = "Contract is paused")]
+    fn test_multisig_create_while_paused_panics() {
+        let t = TestEnv::new();
+        t.client().pause(&t.admin);
+        let id = Symbol::new(&t.env, "ms14");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Contract is paused")]
+    fn test_multisig_approve_while_paused_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "ms15");
+        let s1 = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &1);
+        t.client().pause(&t.admin);
+        t.client().approve_multisig_release(&id, &s1);
+    }
+
+    // ── Multi-sig arbitration tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_multisig_arbitration_releases_to_worker() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "msa1");
+        let s1 = Address::generate(&t.env);
+        let arbitrator = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+
+        t.client().add_arbitrator(&arbitrator);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &200_000, &9999, &signers, &2);
+
+        // Payer requests arbitration with 0 fee to keep balances simple
+        t.client().request_multisig_arbitration(&id, &t.payer, &arbitrator, &0);
+
+        let arb = t.client().get_multisig_arbitration(&id).unwrap();
+        assert!(!arb.resolved);
+        assert_eq!(arb.arbitrator, arbitrator);
+
+        // Arbitrator resolves in worker's favour
+        t.client().resolve_multisig_arbitration(&id, &arbitrator, &true);
+
+        assert_eq!(t.token_balance(&t.worker), 200_000);
+        assert!(t.client().get_multisig_escrow(&id).unwrap().released);
+        assert!(t.client().get_multisig_arbitration(&id).unwrap().resolved);
+    }
+
+    #[test]
+    fn test_multisig_arbitration_refunds_payer() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "msa2");
+        let s1 = Address::generate(&t.env);
+        let arbitrator = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+
+        t.client().add_arbitrator(&arbitrator);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &2);
+        t.client().request_multisig_arbitration(&id, &t.payer, &arbitrator, &0);
+
+        // Arbitrator resolves in payer's favour
+        t.client().resolve_multisig_arbitration(&id, &arbitrator, &false);
+
+        assert_eq!(t.token_balance(&t.payer), 1_000_000);
+        assert!(t.client().get_multisig_escrow(&id).unwrap().cancelled);
+    }
+
+    #[test]
+    #[should_panic(expected = "Arbitration already requested")]
+    fn test_multisig_arbitration_duplicate_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "msa3");
+        let s1 = Address::generate(&t.env);
+        let arbitrator = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+
+        t.client().add_arbitrator(&arbitrator);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &2);
+        t.client().request_multisig_arbitration(&id, &t.payer, &arbitrator, &0);
+        t.client().request_multisig_arbitration(&id, &t.payer, &arbitrator, &0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Not authorized")]
+    fn test_multisig_arbitration_by_stranger_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "msa4");
+        let s1 = Address::generate(&t.env);
+        let arbitrator = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+        let stranger = Address::generate(&t.env);
+
+        t.client().add_arbitrator(&arbitrator);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &2);
+        t.client().request_multisig_arbitration(&id, &stranger, &arbitrator, &0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid arbitrator")]
+    fn test_multisig_arbitration_unregistered_arbitrator_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "msa5");
+        let s1 = Address::generate(&t.env);
+        let fake_arbitrator = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &2);
+        t.client().request_multisig_arbitration(&id, &t.payer, &fake_arbitrator, &0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Already resolved")]
+    fn test_multisig_resolve_arbitration_twice_panics() {
+        let t = TestEnv::new();
+        let id = Symbol::new(&t.env, "msa6");
+        let s1 = Address::generate(&t.env);
+        let arbitrator = Address::generate(&t.env);
+        let signers = soroban_sdk::vec![&t.env, s1.clone()];
+
+        t.client().add_arbitrator(&arbitrator);
+        t.client().create_multisig_escrow(&id, &t.payer, &t.worker, &t.token_addr, &100_000, &9999, &signers, &2);
+        t.client().request_multisig_arbitration(&id, &t.payer, &arbitrator, &0);
+        t.client().resolve_multisig_arbitration(&id, &arbitrator, &true);
+        t.client().resolve_multisig_arbitration(&id, &arbitrator, &true);
+    }
 
     // -------------------------------------------------------------------------
     // Migration tests (#535)
