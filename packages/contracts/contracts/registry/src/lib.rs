@@ -210,6 +210,34 @@ pub struct Badge {
     pub active: bool,
 }
 
+/// A single immutable reputation history entry (#677).
+#[contracttype]
+#[derive(Clone)]
+pub struct ReputationEvent {
+    /// Previous reputation score.
+    pub previous_score: u32,
+    /// New reputation score after this event.
+    pub new_score: u32,
+    /// Human-readable reason (e.g. "review", "slash", "job_completion").
+    pub reason: Symbol,
+    /// Ledger timestamp when this event was recorded.
+    pub timestamp: u64,
+}
+
+/// Aggregated inputs used to compute the weighted reputation score (#677).
+#[contracttype]
+#[derive(Clone)]
+pub struct ReputationInputs {
+    /// Total tips/payments received (used as job-completion proxy).
+    pub tip_count: u32,
+    /// Running sum of review ratings (basis points) for weighted-average calc.
+    pub rating_sum: u64,
+    /// Total number of ratings submitted.
+    pub rating_count: u32,
+    /// Timestamp of the most recent review (for recency decay).
+    pub last_review_at: u64,
+}
+
 /// Result of a single registration attempt in [`RegistryContract::batch_register`].
 #[contracttype]
 #[derive(Clone)]
@@ -294,6 +322,10 @@ pub enum DataKey {
     WorkerCount,
     /// Persistent storage — pending upgrade record for the timelock mechanism.
     PendingUpgrade,
+    /// Persistent storage — `Vec<ReputationEvent>` history keyed by worker id (#677).
+    ReputationHistory(Symbol),
+    /// Persistent storage — [`ReputationInputs`] keyed by worker id (#677).
+    ReputationInputs(Symbol),
 }
 
 // =============================================================================
@@ -1164,10 +1196,322 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
             .get(&DataKey::Worker(id.clone()))
             .expect("Worker not found");
 
+        let prev = worker.reputation;
         worker.reputation = score;
         env.storage().persistent().set(&DataKey::Worker(id.clone()), &worker);
 
+        Self::append_reputation_history(&env, &id, prev, score, Symbol::new(&env, "manual"));
+
         env.events().publish((symbol_short!("RepUpd"), id), score);
+    }
+
+    // -------------------------------------------------------------------------
+    // Reputation system (#677)
+    // -------------------------------------------------------------------------
+
+    /// Weights (out of 100) for the three reputation factors.
+    const REP_WEIGHT_QUALITY: u32 = 60;   // review quality (avg rating)
+    const REP_WEIGHT_VOLUME: u32 = 25;    // tip/job-completion volume
+    const REP_WEIGHT_RECENCY: u32 = 15;   // how recent the last review is
+
+    /// Recency half-life in seconds (~90 days).
+    const RECENCY_HALF_LIFE_SECS: u64 = 7_776_000;
+
+    /// Maximum tip count considered for volume score (caps at 10_000 bps).
+    const MAX_TIP_VOLUME: u32 = 50;
+
+    /// Maximum history entries stored per worker.
+    const MAX_HISTORY_LEN: u32 = 100;
+
+    /// Minimum rating sum to trigger a slash (quality below this threshold).
+    /// Below 3000 bps avg with at least 3 reviews triggers automatic slashing.
+    const SLASH_THRESHOLD_RATING: u32 = 3_000;
+    const SLASH_MIN_REVIEWS: u32 = 3;
+
+    /// Compute the weighted reputation score from [`ReputationInputs`].
+    ///
+    /// Formula:
+    /// - quality_score  = avg_rating (bps) × 0.60
+    /// - volume_score   = min(tip_count / MAX_TIP_VOLUME, 1) × 10000 × 0.25
+    /// - recency_score  = decay(last_review_at, now) × 10000 × 0.15
+    ///   where decay = 0.5 ^ (elapsed / HALF_LIFE)  (approximated as linear for gas efficiency)
+    ///
+    /// Returns a score in basis points (0–10000).
+    fn compute_weighted_reputation(inputs: &ReputationInputs, now: u64) -> u32 {
+        // quality component
+        let avg_rating = if inputs.rating_count == 0 {
+            0u32
+        } else {
+            (inputs.rating_sum / inputs.rating_count as u64) as u32
+        };
+        let quality = avg_rating
+            .checked_mul(Self::REP_WEIGHT_QUALITY)
+            .expect("overflow")
+            / 100;
+
+        // volume component — saturate at MAX_TIP_VOLUME tips
+        let vol_bps = (inputs.tip_count.min(Self::MAX_TIP_VOLUME) as u64)
+            .checked_mul(10_000)
+            .expect("overflow")
+            / Self::MAX_TIP_VOLUME as u64;
+        let volume = (vol_bps as u32)
+            .checked_mul(Self::REP_WEIGHT_VOLUME)
+            .expect("overflow")
+            / 100;
+
+        // recency component — linear decay approximation
+        let recency = if inputs.last_review_at == 0 || now <= inputs.last_review_at {
+            0u32
+        } else {
+            let elapsed = now - inputs.last_review_at;
+            // decay = max(0, 1 - elapsed/half_life)
+            let decay_bps: u32 = if elapsed >= Self::RECENCY_HALF_LIFE_SECS {
+                0
+            } else {
+                (10_000u64
+                    .checked_mul(Self::RECENCY_HALF_LIFE_SECS - elapsed)
+                    .expect("overflow")
+                    / Self::RECENCY_HALF_LIFE_SECS) as u32
+            };
+            decay_bps
+                .checked_mul(Self::REP_WEIGHT_RECENCY)
+                .expect("overflow")
+                / 100
+        };
+
+        quality.checked_add(volume).expect("overflow")
+               .checked_add(recency).expect("overflow")
+               .min(10_000)
+    }
+
+    /// Append an entry to the immutable reputation history (capped at MAX_HISTORY_LEN).
+    fn append_reputation_history(env: &Env, id: &Symbol, previous: u32, new_score: u32, reason: Symbol) {
+        let mut history: Vec<ReputationEvent> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReputationHistory(id.clone()))
+            .unwrap_or(Vec::new(env));
+
+        // Drop oldest entry if at capacity
+        if history.len() >= Self::MAX_HISTORY_LEN {
+            let mut trimmed: Vec<ReputationEvent> = Vec::new(env);
+            for i in 1..history.len() {
+                trimmed.push_back(history.get(i).unwrap());
+            }
+            history = trimmed;
+        }
+
+        history.push_back(ReputationEvent {
+            previous_score: previous,
+            new_score,
+            reason,
+            timestamp: env.ledger().timestamp(),
+        });
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReputationHistory(id.clone()), &history);
+    }
+
+    /// Submit a user review for a worker (#677).
+    ///
+    /// Anyone may submit a review. The rating is recorded in [`ReputationInputs`]
+    /// and the worker's `reputation` and `avg_rating` are recalculated immediately.
+    ///
+    /// # Parameters
+    /// - `reviewer`: Address of the reviewer; `require_auth()` is enforced.
+    /// - `worker_id`: The worker's unique identifier.
+    /// - `rating`: Rating in basis points (0–10000).
+    ///
+    /// # Panics
+    /// - `"Worker not found"` if the worker does not exist.
+    /// - `"Rating out of range"` if `rating > 10000`.
+    /// - `"Contract is paused"` if paused.
+    ///
+    /// # Events
+    /// Emits `("RevSub", worker_id)` with data `(reviewer, rating, new_reputation)`.
+    pub fn submit_review(env: Env, reviewer: Address, worker_id: Symbol, rating: u32) {
+        reviewer.require_auth();
+        Self::require_not_paused(&env);
+        assert!(rating <= 10_000, "Rating out of range");
+
+        let mut worker: Worker = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Worker(worker_id.clone()))
+            .expect("Worker not found");
+
+        let now = env.ledger().timestamp();
+
+        // Update ReputationInputs
+        let mut inputs: ReputationInputs = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReputationInputs(worker_id.clone()))
+            .unwrap_or(ReputationInputs {
+                tip_count: 0,
+                rating_sum: 0,
+                rating_count: 0,
+                last_review_at: 0,
+            });
+
+        inputs.rating_sum = inputs.rating_sum.checked_add(rating as u64).expect("overflow");
+        inputs.rating_count = inputs.rating_count.checked_add(1).expect("overflow");
+        inputs.last_review_at = now;
+
+        let new_score = Self::compute_weighted_reputation(&inputs, now);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReputationInputs(worker_id.clone()), &inputs);
+
+        // Update worker aggregate fields
+        let prev_rep = worker.reputation;
+        worker.review_count = worker.review_count.checked_add(1).expect("overflow");
+        worker.avg_rating = (inputs.rating_sum / inputs.rating_count as u64) as u32;
+        worker.reputation = new_score;
+
+        // Slash check: avg below threshold with enough reviews
+        if worker.avg_rating < Self::SLASH_THRESHOLD_RATING && worker.review_count >= Self::SLASH_MIN_REVIEWS {
+            let slashed = worker.reputation / 2;
+            Self::append_reputation_history(&env, &worker_id, worker.reputation, slashed, Symbol::new(&env, "slash"));
+            worker.reputation = slashed;
+            env.events().publish(
+                (Symbol::new(&env, "RepSlashed"), worker_id.clone()),
+                (worker.avg_rating, slashed),
+            );
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Worker(worker_id.clone()), &worker);
+
+        Self::append_reputation_history(&env, &worker_id, prev_rep, new_score, Symbol::new(&env, "review"));
+
+        env.events().publish(
+            (symbol_short!("RevSub"), worker_id),
+            (reviewer, rating, worker.reputation),
+        );
+    }
+
+    /// Record a completed job/tip payment to boost a worker's volume score (#677).
+    ///
+    /// Called by the Market contract (or admin) after a successful tip transfer.
+    /// Increments `tip_count` in [`ReputationInputs`] and recalculates reputation.
+    ///
+    /// # Parameters
+    /// - `caller`: Must hold `ROLE_REP_MGR`; `require_auth()` is enforced.
+    /// - `worker_id`: The worker's unique identifier.
+    ///
+    /// # Panics
+    /// - `"Missing role"` if `caller` does not hold `ROLE_REP_MGR`.
+    /// - `"Worker not found"` if the worker does not exist.
+    ///
+    /// # Events
+    /// Emits `("JobComp", worker_id)` with data `(tip_count, new_reputation)`.
+    pub fn record_job_completion(env: Env, caller: Address, worker_id: Symbol) {
+        let rep_mgr_role = Self::role_symbol(&env, ROLE_REP_MGR_CACHED);
+        Self::require_role(&env, &rep_mgr_role, &caller);
+        Self::require_not_paused(&env);
+
+        let mut worker: Worker = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Worker(worker_id.clone()))
+            .expect("Worker not found");
+
+        let now = env.ledger().timestamp();
+
+        let mut inputs: ReputationInputs = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReputationInputs(worker_id.clone()))
+            .unwrap_or(ReputationInputs {
+                tip_count: 0,
+                rating_sum: 0,
+                rating_count: 0,
+                last_review_at: 0,
+            });
+
+        inputs.tip_count = inputs.tip_count.checked_add(1).expect("overflow");
+
+        let new_score = Self::compute_weighted_reputation(&inputs, now);
+        let prev_rep = worker.reputation;
+        worker.reputation = new_score;
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReputationInputs(worker_id.clone()), &inputs);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Worker(worker_id.clone()), &worker);
+
+        Self::append_reputation_history(&env, &worker_id, prev_rep, new_score, Symbol::new(&env, "job_comp"));
+
+        env.events().publish(
+            (symbol_short!("JobComp"), worker_id),
+            (inputs.tip_count, new_score),
+        );
+    }
+
+    /// Slash a worker's reputation for poor performance (#677).
+    ///
+    /// Reduces the reputation score by `slash_bps` basis points (floor 0).
+    /// Only callable by an address with `ROLE_REP_MGR`.
+    ///
+    /// # Parameters
+    /// - `caller`: Must hold `ROLE_REP_MGR`.
+    /// - `worker_id`: The worker's unique identifier.
+    /// - `slash_bps`: Basis points to subtract (capped so score floor is 0).
+    ///
+    /// # Panics
+    /// - `"Missing role"` if `caller` does not hold `ROLE_REP_MGR`.
+    /// - `"Worker not found"` if the worker does not exist.
+    /// - `"Slash amount out of range"` if `slash_bps > 10000`.
+    ///
+    /// # Events
+    /// Emits `("RepSlash", worker_id)` with data `(slash_bps, new_reputation)`.
+    pub fn slash_reputation(env: Env, caller: Address, worker_id: Symbol, slash_bps: u32) {
+        let rep_mgr_role = Self::role_symbol(&env, ROLE_REP_MGR_CACHED);
+        Self::require_role(&env, &rep_mgr_role, &caller);
+        Self::require_not_paused(&env);
+        assert!(slash_bps <= 10_000, "Slash amount out of range");
+
+        let mut worker: Worker = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Worker(worker_id.clone()))
+            .expect("Worker not found");
+
+        let prev = worker.reputation;
+        worker.reputation = worker.reputation.saturating_sub(slash_bps);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Worker(worker_id.clone()), &worker);
+
+        Self::append_reputation_history(&env, &worker_id, prev, worker.reputation, Symbol::new(&env, "slash"));
+
+        env.events().publish(
+            (symbol_short!("RepSlash"), worker_id),
+            (slash_bps, worker.reputation),
+        );
+    }
+
+    /// Get the immutable reputation history for a worker (#677).
+    ///
+    /// Returns up to the last [`MAX_HISTORY_LEN`] events in chronological order.
+    pub fn get_reputation_history(env: Env, worker_id: Symbol) -> Vec<ReputationEvent> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::ReputationHistory(worker_id))
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Get the raw reputation inputs for a worker (#677).
+    pub fn get_reputation_inputs(env: Env, worker_id: Symbol) -> Option<ReputationInputs> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::ReputationInputs(worker_id))
     }
 
     /// Update a worker's review count and average rating. Admin only.
