@@ -11,6 +11,8 @@ import {
   deleteWorker,
   toggleActivation,
   advancedSearch,
+  getReputation,
+  syncReputation,
 } from '../controllers/workers.js'
 import { toggleBookmark } from '../controllers/bookmarks.js'
 import { createWorkerReview, deleteReview, listWorkerReviews } from './reviews.js'
@@ -106,5 +108,10 @@ router.post('/:id/analytics/view', trackView)
 router.get('/:id/analytics', authenticate, authorize('curator', 'admin'), getAnalytics)
 router.get('/:id/analytics/trends', authenticate, authorize('curator', 'admin'), getViewTrends)
 router.get('/:id/analytics', withAuth(['curator', 'admin']), getAnalytics)
+
+// Reputation (#677)
+router.get('/:id/reputation', cacheMiddleware(TTL.SHORT), getReputation)
+router.post('/:id/reputation/sync', authenticate, authorize('admin'), syncReputation)
+router.post('/:id/reputation/sync', withAuth('admin'), syncReputation)
 
 export default router

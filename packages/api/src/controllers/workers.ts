@@ -7,6 +7,7 @@ import { workerSerializer } from '../serializers/index.js'
 import type { CreateWorkerBody, UpdateWorkerBody, WorkerQuery } from '../interfaces/index.js'
 import { invalidateCachePattern } from '../middleware/cache.js'
 import { processImage, deleteImages } from '../utils/imageProcessor.js'
+import { getWorkerReputation, syncReputationToDb } from '../services/stellar.service.js'
 
 // Haversine distance in km between two lat/lng points
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -382,5 +383,51 @@ export async function advancedSearch(req: Request, res: Response) {
     })
   } catch (error) {
     return handleError(res, error)
+  }
+}
+
+/**
+ * GET /api/workers/:id/reputation
+ * Get the on-chain reputation summary for a worker.
+ *
+ * Returns the worker's verified status, average rating, review count, and
+ * Stellar contract id so the frontend can display trust signals without
+ * requiring a live Stellar RPC call.
+ *
+ * @param req - Route param `id`.
+ * @param res - JSON `{ data: ReputationSummary, status, code }`.
+ */
+export async function getReputation(req: Request, res: Response) {
+  try {
+    const data = await getWorkerReputation(req.params.id)
+    return res.json({ data, status: 'success', code: 200 })
+  } catch (err) {
+    return handleError(res, err)
+  }
+}
+
+/**
+ * POST /api/workers/:id/reputation/sync
+ * Sync a worker's on-chain reputation data into the local database.
+ *
+ * Called by trusted back-end processes (e.g. a Stellar event listener) after
+ * an on-chain reputation change. Requires `admin` role.
+ *
+ * Body: `{ avgRating: number, reviewCount: number, reputation: number }`
+ *
+ * @param req - Route param `id`. Body: `{ avgRating, reviewCount, reputation }`.
+ * @param res - JSON `{ data: Worker, status, code }`.
+ */
+export async function syncReputation(req: Request, res: Response) {
+  try {
+    const { avgRating, reviewCount, reputation } = req.body as {
+      avgRating: number
+      reviewCount: number
+      reputation: number
+    }
+    const data = await syncReputationToDb(req.params.id, avgRating, reviewCount, reputation)
+    return res.json({ data, status: 'success', code: 200 })
+  } catch (err) {
+    return handleError(res, err)
   }
 }

@@ -28,9 +28,208 @@ use soroban_sdk::{
     Address, BytesN, Env, String, Symbol,
 };
 
-// ---------------------------------------------------------------------------
-// Shared fixture
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// 5. Reputation system tests (#677)
+// ===========================================================================
+
+mod reputation_system {
+    use super::*;
+
+    fn setup() -> UpgradeFixture {
+        let f = UpgradeFixture::new();
+        f.client().add_curator(&f.admin, &f.curator);
+        f
+    }
+
+    #[test]
+    fn submit_review_updates_reputation_and_avg_rating() {
+        let f = setup();
+        let id = f.register("worker1");
+        let reviewer = Address::generate(&f.env);
+
+        f.client().submit_review(&reviewer, &id, &8_000);
+
+        let w = f.client().get_worker(&id).unwrap();
+        assert_eq!(w.avg_rating, 8_000);
+        assert_eq!(w.review_count, 1);
+        assert!(w.reputation > 0, "reputation should be non-zero after review");
+    }
+
+    #[test]
+    fn submit_multiple_reviews_weighted_average() {
+        let f = setup();
+        let id = f.register("worker1");
+        let r1 = Address::generate(&f.env);
+        let r2 = Address::generate(&f.env);
+
+        f.client().submit_review(&r1, &id, &6_000);
+        f.client().submit_review(&r2, &id, &8_000);
+
+        let w = f.client().get_worker(&id).unwrap();
+        // avg = (6000 + 8000) / 2 = 7000
+        assert_eq!(w.avg_rating, 7_000);
+        assert_eq!(w.review_count, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Rating out of range")]
+    fn submit_review_out_of_range_panics() {
+        let f = setup();
+        let id = f.register("worker1");
+        let reviewer = Address::generate(&f.env);
+        f.client().submit_review(&reviewer, &id, &10_001);
+    }
+
+    #[test]
+    fn record_job_completion_increments_tip_count_and_score() {
+        let f = setup();
+        let id = f.register("worker1");
+
+        f.client().record_job_completion(&f.admin, &id);
+
+        let inputs = f.client().get_reputation_inputs(&id).unwrap();
+        assert_eq!(inputs.tip_count, 1);
+
+        let w = f.client().get_worker(&id).unwrap();
+        assert!(w.reputation > 0);
+    }
+
+    #[test]
+    fn record_multiple_completions_saturate_volume_score() {
+        let f = setup();
+        let id = f.register("worker1");
+
+        // Record MAX_TIP_VOLUME completions to saturate the volume component
+        for _ in 0..50 {
+            f.client().record_job_completion(&f.admin, &id);
+        }
+        let inputs = f.client().get_reputation_inputs(&id).unwrap();
+        assert_eq!(inputs.tip_count, 50);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn record_job_completion_requires_rep_mgr() {
+        let f = setup();
+        let id = f.register("worker1");
+        let stranger = Address::generate(&f.env);
+        f.client().record_job_completion(&stranger, &id);
+    }
+
+    #[test]
+    fn slash_reputation_reduces_score() {
+        let f = setup();
+        let id = f.register("worker1");
+        // Set a baseline reputation first
+        f.client().update_reputation(&f.admin, &id, &5_000);
+
+        f.client().slash_reputation(&f.admin, &id, &2_000);
+
+        let w = f.client().get_worker(&id).unwrap();
+        assert_eq!(w.reputation, 3_000);
+    }
+
+    #[test]
+    fn slash_reputation_floors_at_zero() {
+        let f = setup();
+        let id = f.register("worker1");
+        f.client().update_reputation(&f.admin, &id, &500);
+
+        f.client().slash_reputation(&f.admin, &id, &2_000);
+
+        let w = f.client().get_worker(&id).unwrap();
+        assert_eq!(w.reputation, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Slash amount out of range")]
+    fn slash_reputation_out_of_range_panics() {
+        let f = setup();
+        let id = f.register("worker1");
+        f.client().slash_reputation(&f.admin, &id, &10_001);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn slash_requires_rep_mgr() {
+        let f = setup();
+        let id = f.register("worker1");
+        let stranger = Address::generate(&f.env);
+        f.client().slash_reputation(&stranger, &id, &1_000);
+    }
+
+    #[test]
+    fn reputation_history_is_recorded_on_review() {
+        let f = setup();
+        let id = f.register("worker1");
+        let reviewer = Address::generate(&f.env);
+
+        f.client().submit_review(&reviewer, &id, &8_000);
+        let history = f.client().get_reputation_history(&id);
+        assert!(history.len() >= 1, "history should have at least one entry");
+
+        let entry = history.get(history.len() - 1).unwrap();
+        assert_eq!(entry.previous_score, 0);
+    }
+
+    #[test]
+    fn reputation_history_recorded_on_slash() {
+        let f = setup();
+        let id = f.register("worker1");
+        f.client().update_reputation(&f.admin, &id, &4_000);
+        f.client().slash_reputation(&f.admin, &id, &1_000);
+
+        let history = f.client().get_reputation_history(&id);
+        let last = history.get(history.len() - 1).unwrap();
+        assert_eq!(last.new_score, 3_000);
+    }
+
+    #[test]
+    fn reputation_history_recorded_on_job_completion() {
+        let f = setup();
+        let id = f.register("worker1");
+
+        f.client().record_job_completion(&f.admin, &id);
+        let history = f.client().get_reputation_history(&id);
+        assert!(history.len() >= 1);
+    }
+
+    #[test]
+    fn auto_slash_triggered_on_low_avg_rating() {
+        let f = setup();
+        let id = f.register("worker1");
+        let r1 = Address::generate(&f.env);
+        let r2 = Address::generate(&f.env);
+        let r3 = Address::generate(&f.env);
+
+        // Three reviews averaging below 3000 bps (SLASH_THRESHOLD_RATING)
+        f.client().submit_review(&r1, &id, &1_000);
+        f.client().submit_review(&r2, &id, &2_000);
+        f.client().submit_review(&r3, &id, &1_500);
+
+        let w = f.client().get_worker(&id).unwrap();
+        // avg = (1000+2000+1500)/3 = 1500 — below threshold → auto-slashed
+        assert!(w.avg_rating < 3_000);
+        // reputation should have been halved from the auto-slash
+        let history = f.client().get_reputation_history(&id);
+        let has_slash = history.iter().any(|e| e.reason == Symbol::new(&f.env, "slash"));
+        assert!(has_slash, "expected a slash event in history");
+    }
+
+    #[test]
+    fn get_reputation_inputs_returns_none_for_new_worker() {
+        let f = setup();
+        let id = f.register("worker1");
+        assert!(f.client().get_reputation_inputs(&id).is_none());
+    }
+
+    #[test]
+    fn get_reputation_history_empty_for_new_worker() {
+        let f = setup();
+        let id = f.register("worker1");
+        assert_eq!(f.client().get_reputation_history(&id).len(), 0);
+    }
+}
 
 /// A registry contract with the bootstrap admin holding every operational role.
 struct UpgradeFixture {
