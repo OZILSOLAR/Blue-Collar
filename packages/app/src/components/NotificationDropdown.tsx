@@ -3,7 +3,8 @@
 import { useRef, useState, useEffect } from "react";
 import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useNotifications, type NotificationType } from "@/context/NotificationContext";
+import { useNotifications } from "@/context/NotificationContext";
+import type { NotificationType } from "@/types";
 import { cn } from "@/lib/utils";
 
 const TYPE_STYLES: Record<NotificationType, string> = {

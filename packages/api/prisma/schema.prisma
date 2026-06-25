@@ -68,6 +68,11 @@ model User {
   jobMessagesReceived         JobMessage[]          @relation("JobMessagesReceived")
   refreshTokens               RefreshToken[]
   notificationPreferences     NotificationPreferences?
+  notifications               Notification[]
+  helpfulVotes                ReviewHelpful[]
+  conversations               ConversationParticipant[]
+  messagesSent                Message[]
+  initiatedConversations      Conversation[]           @relation("ConversationInitiator")
 }
 
 model Category {
@@ -575,4 +580,80 @@ model NotificationPreferences {
   updatedAt         DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Issue #notification: In-App Notifications ──────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String?
+  href      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  tip
+  review
+  contact
+  system
+  message
+}
+
+// ─── Issue #review: Helpful Votes ───────────────────────────────────────────
+
+model ReviewHelpful {
+  id        String   @id @default(cuid())
+  reviewId  String
+  userId    String
+  createdAt DateTime @default(now())
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, userId])
+}
+
+// ─── Issue #messaging: Conversations & Messages ─────────────────────────────
+
+model Conversation {
+  id           String                     @id @default(cuid())
+  subject      String?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime?
+  joinedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  attachmentUrl  String?
+  attachmentType String?
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { listWorkers, listUsers, getStats, bulkToggleWorkers, bulkDeleteWorkers } from '../controllers/admin.js'
+import { listWorkers, listUsers, getStats, bulkToggleWorkers, bulkDeleteWorkers, suspendUser, unsuspendUser, banUser } from '../controllers/admin.js'
 import { importWorkersFromCsvController } from '../controllers/csv-import.js'
 import { exportWorkers, exportUsers } from '../controllers/export.js'
 import { authenticate, authorize } from '../middleware/auth.js'
@@ -31,5 +31,8 @@ router.get('/export/users', exportRateLimit, exportUsers)
 router.post('/workers/import', csvUpload.single('file'), importWorkersFromCsvController)
 router.post('/workers/bulk-toggle', bulkToggleWorkers)
 router.delete('/workers/bulk-delete', bulkDeleteWorkers)
+router.patch('/users/:id/suspend', suspendUser)
+router.patch('/users/:id/unsuspend', unsuspendUser)
+router.patch('/users/:id/ban', banUser)
 
 export default router

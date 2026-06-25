@@ -5,7 +5,7 @@ import { Bell, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { cn } from "@/lib/utils";
-import type { NotificationType } from "@/context/NotificationContext";
+import type { NotificationType } from "@/types";
 
 const PREFS_KEY = "bc_notification_prefs";
 

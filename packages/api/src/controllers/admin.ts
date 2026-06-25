@@ -133,3 +133,41 @@ export async function bulkDeleteWorkers(req: Request, res: Response) {
 
   return res.json({ data: { deleted: result }, status: 'success', code: 200 })
 }
+
+export async function suspendUser(req: Request, res: Response) {
+  const user = await db.user.findUnique({ where: { id: req.params.id } })
+  if (!user) return res.status(404).json({ status: 'error', message: 'User not found', code: 404 })
+  if (user.role === 'admin') return res.status(403).json({ status: 'error', message: 'Cannot suspend another admin', code: 403 })
+
+  await db.user.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } })
+  await db.auditLog.create({
+    data: { userId: req.user!.id, action: 'user.suspend', resource: 'user', resourceId: req.params.id },
+  })
+  return res.json({ data: { id: req.params.id, suspended: true }, status: 'success', code: 200 })
+}
+
+export async function unsuspendUser(req: Request, res: Response) {
+  const user = await db.user.findUnique({ where: { id: req.params.id } })
+  if (!user) return res.status(404).json({ status: 'error', message: 'User not found', code: 404 })
+
+  await db.user.update({ where: { id: req.params.id }, data: { deletedAt: null } })
+  await db.auditLog.create({
+    data: { userId: req.user!.id, action: 'user.unsuspend', resource: 'user', resourceId: req.params.id },
+  })
+  return res.json({ data: { id: req.params.id, suspended: false }, status: 'success', code: 200 })
+}
+
+export async function banUser(req: Request, res: Response) {
+  const user = await db.user.findUnique({ where: { id: req.params.id } })
+  if (!user) return res.status(404).json({ status: 'error', message: 'User not found', code: 404 })
+  if (user.role === 'admin') return res.status(403).json({ status: 'error', message: 'Cannot ban another admin', code: 403 })
+
+  await db.user.update({
+    where: { id: req.params.id },
+    data: { deletedAt: new Date(), email: `banned-${user.id}@deleted.local` },
+  })
+  await db.auditLog.create({
+    data: { userId: req.user!.id, action: 'user.ban', resource: 'user', resourceId: req.params.id },
+  })
+  return res.json({ data: { id: req.params.id, banned: true }, status: 'success', code: 200 })
+}

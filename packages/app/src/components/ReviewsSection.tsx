@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import ReviewCard from "./ReviewCard";
 import ReviewForm from "./ReviewForm";
 import RatingBreakdown from "./RatingBreakdown";
+import ReviewSortFilter, { type SortOption } from "./ReviewSortFilter";
 import EmptyState from "./EmptyState";
 import type { Review, RatingDistributionEntry } from "@/types";
 import { getWorkerReviews } from "@/lib/api";
@@ -32,6 +33,7 @@ export default function ReviewsSection({
   const [filteredReviews, setFilteredReviews] = useState<Review[] | null>(null);
   const [filterLoading, setFilterLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [sort, setSort] = useState<SortOption>("newest");
 
   const hasReviewed = !!user && reviews.some((r) => r.authorId === user.id);
 
@@ -60,14 +62,34 @@ export default function ReviewsSection({
   };
 
   const source = filteredReviews ?? reviews;
-  const displayed = source.slice(0, visibleCount);
-  const hasMore = visibleCount < source.length;
+
+  const sorted = useMemo(() => {
+    const sortedArr = [...source];
+    switch (sort) {
+      case "newest":
+        return sortedArr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case "oldest":
+        return sortedArr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      case "highest":
+        return sortedArr.sort((a, b) => b.rating - a.rating);
+      case "lowest":
+        return sortedArr.sort((a, b) => a.rating - b.rating);
+      default:
+        return sortedArr;
+    }
+  }, [source, sort]);
+
+  const displayed = sorted.slice(0, visibleCount);
+  const hasMore = visibleCount < sorted.length;
 
   return (
-    <div className="mt-8 border-t pt-6">
-      <h2 className="text-base font-semibold text-gray-900 mb-4">
-        Reviews {count > 0 && `(${count})`}
-      </h2>
+    <div className="mt-8 border-t pt-6 dark:border-gray-800">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+          Reviews {count > 0 && `(${count})`}
+        </h2>
+        {count > 0 && <ReviewSortFilter sort={sort} onSortChange={setSort} />}
+      </div>
 
       {count > 0 && (
         <RatingBreakdown
@@ -80,10 +102,10 @@ export default function ReviewsSection({
 
       <div className="mb-6">
         {hasReviewed ? (
-          <p className="text-sm text-gray-500 italic">You have already reviewed this worker.</p>
+          <p className="text-sm text-gray-500 italic dark:text-gray-400">You have already reviewed this worker.</p>
         ) : (
           <>
-            <p className="text-sm font-medium text-gray-700 mb-3">Leave a review</p>
+            <p className="text-sm font-medium text-gray-700 mb-3 dark:text-gray-300">Leave a review</p>
             <ReviewForm workerId={workerId} onReviewCreated={handleReviewCreated} />
           </>
         )}
@@ -99,9 +121,9 @@ export default function ReviewsSection({
           {hasMore && (
             <button
               onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
-              className="mt-4 w-full rounded-lg border py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              className="mt-4 w-full rounded-lg border py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors"
             >
-              Load more ({source.length - visibleCount} remaining)
+              Load more ({sorted.length - visibleCount} remaining)
             </button>
           )}
         </div>
