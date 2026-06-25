@@ -179,7 +179,7 @@ export default function WorkersDiscovery() {
         />
 
         {!loading && !error && (
-          <p className="mb-4 mt-2 text-sm text-gray-500">
+          <p className="mb-4 mt-2 text-sm text-gray-500" role="status" aria-live="polite">
             {resultCount === 0
               ? t("noResults")
               : t("resultsFound", { count: resultCount })}

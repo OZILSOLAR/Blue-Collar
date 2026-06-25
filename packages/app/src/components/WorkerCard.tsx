@@ -58,7 +58,7 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
           {worker.averageRating != null && (
             <div className="flex items-center gap-0.5 shrink-0">
               <StarRating rating={worker.averageRating} size="sm" />
-              <span className="text-xs text-gray-400">{worker.averageRating.toFixed(1)}</span>
+              <span className="text-xs text-gray-500">{worker.averageRating.toFixed(1)}</span>
             </div>
           )}
         </div>
@@ -211,7 +211,7 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
         {worker.averageRating != null && (
           <div className="flex items-center gap-1.5">
             <StarRating rating={worker.averageRating} />
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-500">
               {worker.averageRating.toFixed(1)} ({worker.reviewCount})
             </span>
           </div>
@@ -222,8 +222,8 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
         )}
 
         {worker.location && (
-          <div className="flex items-center gap-1 text-xs text-gray-400">
-            <MapPin size={12} />
+          <div className="flex items-center gap-1 text-xs text-gray-500">
+            <MapPin size={12} aria-hidden="true" />
             <span>{worker.location}</span>
           </div>
         )}

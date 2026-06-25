@@ -70,9 +70,9 @@ export default async function WorkerProfilePage({
     <div className="mx-auto max-w-2xl px-4 py-10">
       <Link
         href="/workers"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
       >
-        <ArrowLeft size={15} />
+        <ArrowLeft size={15} aria-hidden="true" />
         Back to workers
       </Link>
 
