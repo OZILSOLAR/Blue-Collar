@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   BarChart,
@@ -23,12 +24,18 @@ import {
   TrendingDown,
   Download,
   DollarSign,
+  Shield,
+  Scale,
+  ClipboardList,
+  Search,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/useToast";
 import { formatDate } from "@/lib/utils";
 import { AdminDashboardSkeleton } from "@/components/Skeleton";
 import type { PlatformAnalytics, Category } from "@/types";
+import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
 const TOKEN_KEY = "bc_token";
@@ -43,7 +50,7 @@ interface AdminUser {
   verified?: boolean;
 }
 
-type Tab = "overview" | "users" | "categories";
+type Tab = "overview" | "users" | "categories" | "moderation";
 
 function authHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
@@ -152,9 +159,53 @@ export default function AdminDashboard() {
         </button>
       </div>
 
+      {/* Quick Links */}
+      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Link href="/dashboard/admin/users" className="flex items-center gap-3 rounded-lg border bg-white p-4 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 transition-colors">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
+            <Shield size={20} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">User Management</p>
+            <p className="text-xs text-gray-500">Ban, suspend, manage</p>
+          </div>
+          <ExternalLink size={14} className="ml-auto text-gray-400" />
+        </Link>
+        <Link href="/dashboard/admin/disputes" className="flex items-center gap-3 rounded-lg border bg-white p-4 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 transition-colors">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400">
+            <Scale size={20} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Dispute Review</p>
+            <p className="text-xs text-gray-500">Resolve disputes</p>
+          </div>
+          <ExternalLink size={14} className="ml-auto text-gray-400" />
+        </Link>
+        <Link href="/dashboard/admin/audit" className="flex items-center gap-3 rounded-lg border bg-white p-4 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 transition-colors">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
+            <ClipboardList size={20} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Audit Log</p>
+            <p className="text-xs text-gray-500">View activity</p>
+          </div>
+          <ExternalLink size={14} className="ml-auto text-gray-400" />
+        </Link>
+        <button onClick={() => setTab("moderation")} className="flex items-center gap-3 rounded-lg border bg-white p-4 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 transition-colors text-left">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400">
+            <Search size={20} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Moderation</p>
+            <p className="text-xs text-gray-500">Review queue</p>
+          </div>
+          <ExternalLink size={14} className="ml-auto text-gray-400" />
+        </button>
+      </div>
+
       {/* Tabs */}
       <div className="mb-8 flex gap-1 border-b">
-        {(["overview", "users", "categories"] as Tab[]).map((t) => (
+        {(["overview", "users", "categories", "moderation"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -187,6 +238,8 @@ export default function AdminDashboard() {
       {tab === "categories" && (
         <CategoriesTab categories={categories} loading={catsLoading} />
       )}
+
+      {tab === "moderation" && <ModerationTab />}
     </div>
   );
 }
@@ -498,6 +551,107 @@ function GrowthCard({
         </span>
       </div>
       <p className="text-xs text-gray-400 mt-1">vs last month</p>
+    </div>
+  );
+}
+
+function ModerationTab() {
+  const [reviews, setReviews] = useState<Array<{
+    id: string; rating: number; comment?: string | null; body?: string | null;
+    flagged: boolean; flagReason?: string | null; status: string; createdAt: string;
+    worker: { id: string; name: string };
+    author: { id: string; firstName: string; lastName: string };
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchQueue = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/v1/reviews/moderation/queue`, { headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      setReviews(json.data);
+    } catch {
+      toast("Failed to load moderation queue", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { fetchQueue(); }, [fetchQueue]);
+
+  const handleModerate = async (reviewId: string, action: "approve" | "reject") => {
+    setActionLoading(reviewId);
+    try {
+      const res = await fetch(`${API}/v1/reviews/${reviewId}/moderate`, {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) throw new Error();
+      toast(`Review ${action}d`, "success");
+      setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+    } catch {
+      toast("Failed to moderate review", "error");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /></div>;
+  }
+
+  if (reviews.length === 0) {
+    return <div className="flex flex-col items-center justify-center gap-3 py-20 text-gray-400">
+      <Search size={40} className="opacity-30" />
+      <p className="text-sm">No reviews pending moderation</p>
+    </div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {reviews.map((review) => (
+        <div key={review.id} className="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-medium text-gray-900 dark:text-gray-100">{review.author.firstName} {review.author.lastName}</span>
+                <span className="text-xs text-gray-400">reviewed</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{review.worker.name}</span>
+              </div>
+              <div className="flex items-center gap-1 mb-1">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} size={12} className={s <= review.rating ? "text-yellow-400" : "text-gray-200"} fill={s <= review.rating ? "currentColor" : "none"} />
+                ))}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{review.comment ?? review.body}</p>
+              {review.flagged && review.flagReason && (
+                <p className="mt-1 text-xs text-red-500">Flagged: {review.flagReason}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-400">{formatDate(new Date(review.createdAt))}</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={() => handleModerate(review.id, "approve")}
+                disabled={actionLoading === review.id}
+                className="rounded-lg bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {actionLoading === review.id ? <Loader2 size={14} className="animate-spin" /> : "Approve"}
+              </button>
+              <button
+                onClick={() => handleModerate(review.id, "reject")}
+                disabled={actionLoading === review.id}
+                className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

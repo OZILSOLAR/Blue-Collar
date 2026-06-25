@@ -267,3 +267,64 @@ export interface JobMessage {
   sender: { id: string; firstName: string; lastName: string; avatar?: string | null };
   recipient: { id: string; firstName: string; lastName: string; avatar?: string | null };
 }
+
+// ── Notifications ───────────────────────────────────────────────────────────
+
+export type NotificationType = "tip" | "review" | "contact" | "system" | "message";
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message?: string | null;
+  href?: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+// ── Conversations ───────────────────────────────────────────────────────────
+
+export interface Conversation {
+  id: string;
+  subject?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  participants: ConversationParticipant[];
+  messages?: Message[];
+  unreadCount?: number;
+}
+
+export interface ConversationParticipant {
+  id: string;
+  conversationId: string;
+  userId: string;
+  lastReadAt?: string | null;
+  joinedAt: string;
+  user: { id: string; firstName: string; lastName: string; avatar?: string | null };
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  attachmentUrl?: string | null;
+  attachmentType?: string | null;
+  readAt?: string | null;
+  createdAt: string;
+  sender: { id: string; firstName: string; lastName: string; avatar?: string | null };
+}
+
+// ── Audit Log ──────────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string;
+  userId?: string | null;
+  action: string;
+  resource?: string | null;
+  resourceId?: string | null;
+  meta?: Record<string, unknown> | null;
+  createdAt: string;
+  user?: { id: string; firstName: string; lastName: string; email: string } | null;
+}

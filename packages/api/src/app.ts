@@ -22,6 +22,9 @@ import referralRoutes from './routes/referral.js'
 import analyticsRoutes from './routes/analytics.js'
 import paymentRoutes from './routes/payments.js'
 import jobRoutes from './routes/jobs.js'
+import notificationRoutes from './routes/notifications.js'
+import conversationRoutes from './routes/conversations.js'
+import helpfulRoutes from './routes/helpful.js'
 import vitalsRoutes from './routes/vitals.js'
 import { auditMiddleware } from './middleware/audit.js'
 import { sanitize } from './middleware/sanitize.js'
@@ -81,6 +84,9 @@ app.use('/api/referrals', referralRoutes)
 app.use('/api/analytics', analyticsRoutes)
 app.use('/api/payments', paymentRoutes)
 app.use('/api/jobs', jobRoutes)
+app.use('/api/notifications', notificationRoutes)
+app.use('/api/conversations', conversationRoutes)
+app.use('/api/reviews', helpfulRoutes)
 app.use('/api', vitalsRoutes)
 // ── Versioned routes (v1) ─────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes)
@@ -98,6 +104,9 @@ app.use('/api/v1/workers', insuranceRoutes)
 app.use('/api/v1/referrals', referralRoutes)
 app.use('/api/v1/payments', paymentRoutes)
 app.use('/api/v1/jobs', jobRoutes)
+app.use('/api/v1/notifications', notificationRoutes)
+app.use('/api/v1/conversations', conversationRoutes)
+app.use('/api/v1/reviews', helpfulRoutes)
 
 // ── Versioned routes (v2) ─────────────────────────────────────────────────────
 app.use('/api/v2/auth', authRoutes)
@@ -114,6 +123,9 @@ app.use('/api/v2', responseTimeRoutes)
 app.use('/api/v2/workers', insuranceRoutes)
 app.use('/api/v2/referrals', referralRoutes)
 app.use('/api/v2/payments', paymentRoutes)
+app.use('/api/v2/notifications', notificationRoutes)
+app.use('/api/v2/conversations', conversationRoutes)
+app.use('/api/v2/reviews', helpfulRoutes)
 
 // ── Version endpoint ──────────────────────────────────────────────────────────
 app.get('/api/version', (_req, res) => {
