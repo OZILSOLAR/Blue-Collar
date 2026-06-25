@@ -16,7 +16,46 @@
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
-    "back": "Back"
+    "back": "Back",
+    "close": "Close",
+    "tryAgain": "Try again"
+  },
+  "nav": {
+    "home": "Home",
+    "workers": "Workers",
+    "about": "About",
+    "language": "Language",
+    "theme": "Toggle theme",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "profile": "Profile",
+    "dashboard": "Dashboard",
+    "adminAnalytics": "Admin Analytics",
+    "connectWallet": "Connect Wallet",
+    "connecting": "Connecting…",
+    "disconnectWallet": "Disconnect Wallet",
+    "testnet": "testnet",
+    "mainnet": "mainnet"
+  },
+  "hero": {
+    "title": "Find Skilled Workers Near You",
+    "subtitle": "Connect with trusted local tradespeople — plumbers, electricians, carpenters, and more. Secure payments powered by Stellar blockchain.",
+    "categoryPlaceholder": "Category (e.g. Plumber)",
+    "locationPlaceholder": "Location (e.g. Lagos)",
+    "browseWorkers": "Browse Workers",
+    "getStarted": "Get Started",
+    "browseAll": "Browse All Workers",
+    "ariaCategory": "Worker category",
+    "ariaLocation": "Location"
+  },
+  "footer": {
+    "description": "Find skilled workers near you. A decentralised protocol connecting local tradespeople with the communities that need them.",
+    "quickLinks": "Quick Links",
+    "legal": "Legal",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "community": "Community",
+    "copyright": "© {year} BlueCollar. All rights reserved."
   },
   "workers": {
     "title": "Find Skilled Workers",
@@ -47,5 +86,148 @@
     "contactRequests": "Contact Requests",
     "createWorker": "Create Worker",
     "noWorkers": "No workers yet"
+  },
+  "workerCard": {
+    "viewProfile": "View Profile",
+    "compare": "Compare",
+    "featured": "Featured",
+    "verified": "Verified",
+    "reviews": "reviews",
+    "compareAria": "Compare {name}",
+    "bookmarkAdd": "Bookmark worker",
+    "bookmarkRemove": "Remove bookmark"
+  },
+  "contact": {
+    "title": "Contact {name}",
+    "description": "Send a message to get in touch.",
+    "messageLabel": "Your message",
+    "messagePlaceholder": "Hi {name}, I'd like to discuss...",
+    "messageSent": "Message sent!",
+    "messageSentDescription": "{name} will be notified and may reach out to you.",
+    "errorEmpty": "Message cannot be empty.",
+    "errorTooShort": "Message must be at least 10 characters.",
+    "errorTooLong": "Message must be under 1000 characters.",
+    "errorRateLimit": "You've sent too many messages. Please wait before trying again.",
+    "errorGeneric": "Failed to send message.",
+    "ariaClose": "Close dialog",
+    "charCount": "{count}/1000"
+  },
+  "tip": {
+    "title": "Send a Tip",
+    "description": "Reward {name} for excellent service",
+    "recipient": "Recipient",
+    "amount": "Amount",
+    "token": "Token",
+    "tokenXlm": "XLM (Stellar Lumens)",
+    "tokenUsdc": "USDC (USD Coin)",
+    "amountLabel": "Amount ({token})",
+    "networkFee": "Network Fee",
+    "total": "Total",
+    "waitingForSignature": "Waiting for signature",
+    "pleaseConfirm": "Please confirm in your Freighter wallet",
+    "processing": "Processing transaction",
+    "broadcasting": "Broadcasting to Stellar network…",
+    "successTitle": "Tip sent successfully!",
+    "successDescription": "{name} has received your tip",
+    "viewOnExplorer": "View on Stellar Expert",
+    "freighterNotFound": "Freighter not found",
+    "freighterDescription": "Install the Freighter browser extension to send tips",
+    "downloadFreighter": "Download Freighter",
+    "insufficientBalance": "Insufficient balance",
+    "insufficientBalanceDesc": "You don't have enough {token} to send this tip",
+    "tryDifferentAmount": "Try a different amount",
+    "transactionFailed": "Transaction failed",
+    "tryAgain": "Try again",
+    "signing": "Signing…",
+    "ariaClose": "Close dialog"
+  },
+  "search": {
+    "placeholder": "Search workers by name or skill...",
+    "ariaLabel": "Search workers",
+    "clear": "Clear search"
+  },
+  "filters": {
+    "title": "Filters",
+    "clearAll": "Clear all",
+    "category": "Category",
+    "allCategories": "All categories",
+    "location": "Location",
+    "cityPlaceholder": "City...",
+    "statePlaceholder": "State / Region...",
+    "mobileTrigger": "Filters",
+    "mobileTitle": "Filter Workers",
+    "showResults": "Show Results",
+    "activeSearch": "Search: \"{query}\"",
+    "activeCategory": "Category: {name}",
+    "activeCity": "City: {name}",
+    "activeState": "State: {name}",
+    "removeFilter": "Remove filter: {label}"
+  },
+  "workersDiscovery": {
+    "searchPlaceholder": "Search workers by name or skill...",
+    "noResults": "No results",
+    "resultsFound": "{count, plural, one {# worker found} other {# workers found}}",
+    "errorTitle": "Something went wrong",
+    "emptyTitle": "No workers found",
+    "emptyDescription": "Try broadening your search or removing some filters.",
+    "clearAllFilters": "Clear all filters"
+  },
+  "offline": {
+    "offline": "You're offline",
+    "syncing": "{count, plural, one {Syncing # change...} other {Syncing # changes...}}",
+    "pending": "{count, plural, one {# change pending} other {# changes pending}}"
+  },
+  "installPrompt": {
+    "install": "Install BlueCollar",
+    "description": "Get the best experience with our app",
+    "notNow": "Not now",
+    "dismiss": "Dismiss install prompt"
+  },
+  "categories": {
+    "title": "Browse by Category",
+    "workersCount": "{count} workers"
+  },
+  "featuredWorkers": {
+    "title": "Featured Workers",
+    "empty": "No workers available yet. Check back soon.",
+    "seeAll": "See All Workers"
+  },
+  "howItWorks": {
+    "title": "How It Works",
+    "step1Title": "Search for a Skill",
+    "step1Desc": "Browse categories or search by skill and location to find the right tradesperson.",
+    "step2Title": "Find a Verified Worker",
+    "step2Desc": "Every listing is community-curated and anchored on-chain for transparency.",
+    "step3Title": "Pay Securely On-Chain",
+    "step3Desc": "Send tips and payments directly to workers via Stellar — no middlemen."
+  },
+  "testimonials": {
+    "title": "Trusted by Workers & Customers",
+    "subtitle": "See what people are saying about BlueCollar"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "pageAria": "Page {page}"
+  },
+  "errors": {
+    "genericTitle": "Something went wrong",
+    "genericDescription": "An unexpected error occurred. Please try again.",
+    "reportError": "Report this error",
+    "reportDescription": "Help us fix this issue by submitting a report.",
+    "apiDefault": "An unexpected error occurred.",
+    "apiNetwork": "Unable to connect. Please check your internet connection.",
+    "apiUnauthorized": "Your session has expired. Please log in again.",
+    "apiNotFound": "The requested resource was not found.",
+    "apiValidation": "Please check your input and try again."
+  },
+  "languageSwitcher": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "pt": "Português"
+  },
+  "accessibility": {
+    "skipToMain": "Skip to main content"
   }
 }

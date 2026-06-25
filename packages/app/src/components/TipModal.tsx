@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactNode, ChangeEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X, Loader2, CheckCircle2, AlertCircle, ExternalLink, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   isConnected,
   requestAccess,
@@ -18,7 +19,7 @@ const SOROBAN_RPC = "https://soroban-testnet.stellar.org";
 const MARKET_CONTRACT_ID = process.env.NEXT_PUBLIC_MARKET_CONTRACT_ID ?? "";
 const STROOPS_PER_XLM = 10_000_000n;
 const EXPLORER_BASE = "https://stellar.expert/explorer/testnet/tx";
-const NETWORK_FEE = 0.00001; // XLM
+const NETWORK_FEE = 0.00001;
 
 type TxStatus = "idle" | "signing" | "pending" | "success" | "error";
 type ErrorType = "freighter_missing" | "insufficient_balance" | "user_rejected" | "network_error" | "unknown";
@@ -29,7 +30,8 @@ interface Props {
   trigger?: ReactNode;
 }
 
-export default function TipModalEnhanced({ workerName, walletAddress, trigger }: Props) {
+export default function TipModal({ workerName, walletAddress, trigger }: Props) {
+  const t = useTranslations("tip");
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [selectedToken, setSelectedToken] = useState("XLM");
@@ -65,7 +67,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
       const connected = await isConnected();
       if (!connected.isConnected) {
         setErrorType("freighter_missing");
-        setErrorMsg("Freighter wallet not detected");
+        setErrorMsg(t("freighterNotFound"));
         setStatus("error");
         return;
       }
@@ -138,7 +140,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
         {trigger ?? (
           <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
             <Zap size={16} />
-            Send Tip
+            {t("sendTip")}
           </button>
         )}
       </Dialog.Trigger>
@@ -146,18 +148,17 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-2xl">
-          {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-white">
-                Send a Tip
+                {t("title")}
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Reward {workerName} for excellent service
+                {t("description", { name: workerName })}
               </Dialog.Description>
             </div>
             <Dialog.Close
-              aria-label="Close dialog"
+              aria-label={t("ariaClose")}
               className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <X size={20} aria-hidden="true" />
@@ -165,22 +166,20 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
           </div>
 
           <div className="space-y-4">
-            {/* Worker Info */}
             <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-4 border border-blue-200 dark:border-blue-900">
               <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-2">
-                Recipient
+                {t("recipient")}
               </p>
               <p className="font-mono text-sm text-gray-700 dark:text-gray-300 break-all">
                 {walletAddress}
               </p>
             </div>
 
-            {/* Amount Input */}
             {(status === "idle" || status === "signing") && (
               <>
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                    Amount
+                    {t("amount")}
                   </label>
                   <div className="relative">
                     <input
@@ -191,6 +190,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                       value={amount}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => setAmount(e.target.value)}
                       disabled={status === "signing"}
+                      aria-label={t("amountLabel", { token: selectedToken })}
                       className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 pr-16 text-lg font-semibold text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-gray-500 dark:text-gray-400">
@@ -199,10 +199,9 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                   </div>
                 </div>
 
-                {/* Token Selector */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                    Token
+                    {t("token")}
                   </label>
                   <select
                     value={selectedToken}
@@ -210,31 +209,29 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                     disabled={status === "signing"}
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   >
-                    <option value="XLM">XLM (Stellar Lumens)</option>
-                    <option value="USDC">USDC (USD Coin)</option>
+                    <option value="XLM">{t("tokenXlm")}</option>
+                    <option value="USDC">{t("tokenUsdc")}</option>
                   </select>
                 </div>
 
-                {/* Fee Preview */}
                 <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Amount</span>
+                    <span className="text-gray-600 dark:text-gray-400">{t("amount")}</span>
                     <span className="font-medium text-gray-900 dark:text-white">{amount || "0"} {selectedToken}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Network Fee</span>
+                    <span className="text-gray-600 dark:text-gray-400">{t("networkFee")}</span>
                     <span className="font-medium text-gray-900 dark:text-white">{calculateFee().toFixed(7)} {selectedToken}</span>
                   </div>
                   <div className="h-px bg-gray-200 dark:bg-gray-700" />
                   <div className="flex justify-between text-sm font-semibold">
-                    <span className="text-gray-900 dark:text-white">Total</span>
+                    <span className="text-gray-900 dark:text-white">{t("total")}</span>
                     <span className="text-blue-600 dark:text-blue-400">{total} {selectedToken}</span>
                   </div>
                 </div>
               </>
             )}
 
-            {/* Signing State */}
             {status === "signing" && (
               <div className="flex flex-col items-center gap-3 py-8 text-center">
                 <div className="relative w-12 h-12">
@@ -242,15 +239,12 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                   <Loader2 size={32} className="absolute inset-0 m-auto animate-spin text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">Waiting for signature</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Please confirm in your Freighter wallet
-                  </p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{t("waitingForSignature")}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("pleaseConfirm")}</p>
                 </div>
               </div>
             )}
 
-            {/* Pending State */}
             {status === "pending" && (
               <div className="flex flex-col items-center gap-3 py-8 text-center">
                 <div className="relative w-12 h-12">
@@ -258,15 +252,12 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                   <Loader2 size={32} className="absolute inset-0 m-auto animate-spin text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">Processing transaction</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Broadcasting to Stellar network…
-                  </p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{t("processing")}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("broadcasting")}</p>
                 </div>
               </div>
             )}
 
-            {/* Success State */}
             {status === "success" && txHash && (
               <div className="flex flex-col items-center gap-4 py-8 text-center">
                 <div className="relative w-16 h-16">
@@ -274,10 +265,8 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                   <CheckCircle2 size={40} className="absolute inset-0 m-auto text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="font-bold text-lg text-gray-900 dark:text-white">Tip sent successfully!</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {workerName} has received your tip
-                  </p>
+                  <p className="font-bold text-lg text-gray-900 dark:text-white">{t("successTitle")}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("successDescription", { name: workerName })}</p>
                 </div>
                 <a
                   href={`${EXPLORER_BASE}/${txHash}`}
@@ -285,7 +274,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-950/30 px-4 py-2 text-sm font-medium text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50 transition-colors border border-green-200 dark:border-green-900"
                 >
-                  View on Stellar Expert
+                  {t("viewOnExplorer")}
                   <ExternalLink size={14} />
                 </a>
                 <p className="font-mono text-xs text-gray-400 dark:text-gray-500 break-all max-w-xs">
@@ -294,7 +283,6 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
               </div>
             )}
 
-            {/* Error State */}
             {status === "error" && (
               <div className="flex flex-col items-center gap-4 py-8 text-center">
                 <div className="relative w-16 h-16">
@@ -305,10 +293,8 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                 {errorType === "freighter_missing" ? (
                   <>
                     <div>
-                      <p className="font-bold text-lg text-gray-900 dark:text-white">Freighter not found</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Install the Freighter browser extension to send tips
-                      </p>
+                      <p className="font-bold text-lg text-gray-900 dark:text-white">{t("freighterNotFound")}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("freighterDescription")}</p>
                     </div>
                     <a
                       href="https://www.freighter.app"
@@ -316,29 +302,27 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors"
                     >
-                      Download Freighter
+                      {t("downloadFreighter")}
                       <ExternalLink size={14} />
                     </a>
                   </>
                 ) : errorType === "insufficient_balance" ? (
                   <>
                     <div>
-                      <p className="font-bold text-lg text-gray-900 dark:text-white">Insufficient balance</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        You don't have enough {selectedToken} to send this tip
-                      </p>
+                      <p className="font-bold text-lg text-gray-900 dark:text-white">{t("insufficientBalance")}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("insufficientBalanceDesc", { token: selectedToken })}</p>
                     </div>
                     <button
                       onClick={reset}
                       className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
                     >
-                      Try a different amount
+                      {t("tryDifferentAmount")}
                     </button>
                   </>
                 ) : (
                   <>
                     <div>
-                      <p className="font-bold text-lg text-gray-900 dark:text-white">Transaction failed</p>
+                      <p className="font-bold text-lg text-gray-900 dark:text-white">{t("transactionFailed")}</p>
                       {errorMsg && (
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 bg-red-50 dark:bg-red-950/30 rounded-lg p-3 border border-red-200 dark:border-red-900">
                           {errorMsg}
@@ -349,7 +333,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                       onClick={reset}
                       className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
                     >
-                      Try again
+                      {t("tryAgain")}
                     </button>
                   </>
                 )}
@@ -357,11 +341,10 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
             )}
           </div>
 
-          {/* Footer Actions */}
           {(status === "idle" || status === "signing") && (
             <div className="mt-6 flex gap-3">
               <Dialog.Close className="flex-1 rounded-lg border border-gray-300 dark:border-gray-700 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                Cancel
+                {t("cancel")}
               </Dialog.Close>
               <button
                 onClick={sendTip}
@@ -373,7 +356,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
                     : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-800"
                 )}
               >
-                {status === "signing" ? "Signing…" : "Send Tip"}
+                {status === "signing" ? t("signing") : t("sendTip")}
               </button>
             </div>
           )}
@@ -381,7 +364,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
           {status === "success" && (
             <div className="mt-6">
               <Dialog.Close className="w-full rounded-lg bg-gray-100 dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                Close
+                {t("close")}
               </Dialog.Close>
             </div>
           )}
@@ -389,7 +372,7 @@ export default function TipModalEnhanced({ workerName, walletAddress, trigger }:
           {status === "error" && (
             <div className="mt-6">
               <Dialog.Close className="w-full rounded-lg bg-gray-100 dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                Close
+                {t("close")}
               </Dialog.Close>
             </div>
           )}

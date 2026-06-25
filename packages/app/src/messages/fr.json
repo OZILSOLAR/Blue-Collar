@@ -16,7 +16,46 @@
     "save": "Enregistrer",
     "delete": "Supprimer",
     "edit": "Modifier",
-    "back": "Retour"
+    "back": "Retour",
+    "close": "Fermer",
+    "tryAgain": "Réessayer"
+  },
+  "nav": {
+    "home": "Accueil",
+    "workers": "Travailleurs",
+    "about": "À propos",
+    "language": "Langue",
+    "theme": "Changer le thème",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "profile": "Profil",
+    "dashboard": "Tableau de bord",
+    "adminAnalytics": "Analyses admin",
+    "connectWallet": "Connecter le portefeuille",
+    "connecting": "Connexion…",
+    "disconnectWallet": "Déconnecter le portefeuille",
+    "testnet": "testnet",
+    "mainnet": "mainnet"
+  },
+  "hero": {
+    "title": "Trouvez des travailleurs qualifiés près de chez vous",
+    "subtitle": "Connectez-vous avec des artisans locaux de confiance — plombiers, électriciens, menuisiers et plus. Paiements sécurisés via la blockchain Stellar.",
+    "categoryPlaceholder": "Catégorie (ex. Plombier)",
+    "locationPlaceholder": "Lieu (ex. Paris)",
+    "browseWorkers": "Parcourir les travailleurs",
+    "getStarted": "Commencer",
+    "browseAll": "Voir tous les travailleurs",
+    "ariaCategory": "Catégorie de travailleur",
+    "ariaLocation": "Lieu"
+  },
+  "footer": {
+    "description": "Trouvez des travailleurs qualifiés près de chez vous. Un protocole décentralisé connectant les artisans locaux avec les communautés qui en ont besoin.",
+    "quickLinks": "Liens rapides",
+    "legal": "Mentions légales",
+    "privacyPolicy": "Politique de confidentialité",
+    "termsOfService": "Conditions d'utilisation",
+    "community": "Communauté",
+    "copyright": "© {year} BlueCollar. Tous droits réservés."
   },
   "workers": {
     "title": "Trouver des travailleurs qualifiés",
@@ -47,5 +86,148 @@
     "contactRequests": "Demandes de contact",
     "createWorker": "Créer un travailleur",
     "noWorkers": "Aucun travailleur pour le moment"
+  },
+  "workerCard": {
+    "viewProfile": "Voir le profil",
+    "compare": "Comparer",
+    "featured": "À la une",
+    "verified": "Vérifié",
+    "reviews": "avis",
+    "compareAria": "Comparer {name}",
+    "bookmarkAdd": "Ajouter aux favoris",
+    "bookmarkRemove": "Retirer des favoris"
+  },
+  "contact": {
+    "title": "Contacter {name}",
+    "description": "Envoyez un message pour entrer en contact.",
+    "messageLabel": "Votre message",
+    "messagePlaceholder": "Bonjour {name}, je souhaiterais discuter...",
+    "messageSent": "Message envoyé!",
+    "messageSentDescription": "{name} sera notifié et pourra vous répondre.",
+    "errorEmpty": "Le message ne peut pas être vide.",
+    "errorTooShort": "Le message doit contenir au moins 10 caractères.",
+    "errorTooLong": "Le message doit faire moins de 1000 caractères.",
+    "errorRateLimit": "Vous avez envoyé trop de messages. Veuillez attendre avant de réessayer.",
+    "errorGeneric": "Échec de l'envoi du message.",
+    "ariaClose": "Fermer la boîte de dialogue",
+    "charCount": "{count}/1000"
+  },
+  "tip": {
+    "title": "Envoyer un pourboire",
+    "description": "Récompenser {name} pour un service excellent",
+    "recipient": "Destinataire",
+    "amount": "Montant",
+    "token": "Jeton",
+    "tokenXlm": "XLM (Stellar Lumens)",
+    "tokenUsdc": "USDC (USD Coin)",
+    "amountLabel": "Montant ({token})",
+    "networkFee": "Frais de réseau",
+    "total": "Total",
+    "waitingForSignature": "En attente de signature",
+    "pleaseConfirm": "Veuillez confirmer dans votre portefeuille Freighter",
+    "processing": "Traitement de la transaction",
+    "broadcasting": "Diffusion sur le réseau Stellar…",
+    "successTitle": "Pourboire envoyé avec succès!",
+    "successDescription": "{name} a reçu votre pourboire",
+    "viewOnExplorer": "Voir sur Stellar Expert",
+    "freighterNotFound": "Freighter non trouvé",
+    "freighterDescription": "Installez l'extension Freighter pour envoyer des pourboires",
+    "downloadFreighter": "Télécharger Freighter",
+    "insufficientBalance": "Solde insuffisant",
+    "insufficientBalanceDesc": "Vous n'avez pas assez de {token} pour envoyer ce pourboire",
+    "tryDifferentAmount": "Essayer un montant différent",
+    "transactionFailed": "Échec de la transaction",
+    "tryAgain": "Réessayer",
+    "signing": "Signature…",
+    "ariaClose": "Fermer la boîte de dialogue"
+  },
+  "search": {
+    "placeholder": "Rechercher des travailleurs par nom ou compétence...",
+    "ariaLabel": "Rechercher des travailleurs",
+    "clear": "Effacer la recherche"
+  },
+  "filters": {
+    "title": "Filtres",
+    "clearAll": "Tout effacer",
+    "category": "Catégorie",
+    "allCategories": "Toutes les catégories",
+    "location": "Lieu",
+    "cityPlaceholder": "Ville...",
+    "statePlaceholder": "Région...",
+    "mobileTrigger": "Filtres",
+    "mobileTitle": "Filtrer les travailleurs",
+    "showResults": "Afficher les résultats",
+    "activeSearch": "Recherche : \"{query}\"",
+    "activeCategory": "Catégorie : {name}",
+    "activeCity": "Ville : {name}",
+    "activeState": "Région : {name}",
+    "removeFilter": "Supprimer le filtre : {label}"
+  },
+  "workersDiscovery": {
+    "searchPlaceholder": "Rechercher des travailleurs par nom ou compétence...",
+    "noResults": "Aucun résultat",
+    "resultsFound": "{count, plural, one {# travailleur trouvé} other {# travailleurs trouvés}}",
+    "errorTitle": "Quelque chose s'est mal passé",
+    "emptyTitle": "Aucun travailleur trouvé",
+    "emptyDescription": "Essayez d'élargir votre recherche ou de supprimer certains filtres.",
+    "clearAllFilters": "Effacer tous les filtres"
+  },
+  "offline": {
+    "offline": "Vous êtes hors ligne",
+    "syncing": "{count, plural, one {Synchronisation de # changement...} other {Synchronisation de # changements...}}",
+    "pending": "{count, plural, one {# changement en attente} other {# changements en attente}}"
+  },
+  "installPrompt": {
+    "install": "Installer BlueCollar",
+    "description": "Profitez de la meilleure expérience avec notre application",
+    "notNow": "Pas maintenant",
+    "dismiss": "Ignorer l'invite d'installation"
+  },
+  "categories": {
+    "title": "Parcourir par catégorie",
+    "workersCount": "{count} travailleurs"
+  },
+  "featuredWorkers": {
+    "title": "Travailleurs à la une",
+    "empty": "Aucun travailleur disponible pour le moment. Revenez bientôt.",
+    "seeAll": "Voir tous les travailleurs"
+  },
+  "howItWorks": {
+    "title": "Comment ça marche",
+    "step1Title": "Rechercher une compétence",
+    "step1Desc": "Parcourez les catégories ou recherchez par compétence et lieu pour trouver le bon artisan.",
+    "step2Title": "Trouver un travailleur vérifié",
+    "step2Desc": "Chaque annonce est organisée par la communauté et ancrée sur la chaîne pour la transparence.",
+    "step3Title": "Payer en toute sécurité sur la chaîne",
+    "step3Desc": "Envoyez des pourboires et des paiements directement aux travailleurs via Stellar — sans intermédiaires."
+  },
+  "testimonials": {
+    "title": "Approuvé par les travailleurs et les clients",
+    "subtitle": "Découvrez ce que les gens disent de BlueCollar"
+  },
+  "pagination": {
+    "previous": "Précédent",
+    "next": "Suivant",
+    "pageAria": "Page {page}"
+  },
+  "errors": {
+    "genericTitle": "Quelque chose s'est mal passé",
+    "genericDescription": "Une erreur inattendue s'est produite. Veuillez réessayer.",
+    "reportError": "Signaler cette erreur",
+    "reportDescription": "Aidez-nous à résoudre ce problème en soumettant un rapport.",
+    "apiDefault": "Une erreur inattendue s'est produite.",
+    "apiNetwork": "Connexion impossible. Veuillez vérifier votre connexion Internet.",
+    "apiUnauthorized": "Votre session a expiré. Veuillez vous reconnecter.",
+    "apiNotFound": "La ressource demandée est introuvable.",
+    "apiValidation": "Veuillez vérifier votre saisie et réessayer."
+  },
+  "languageSwitcher": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "pt": "Português"
+  },
+  "accessibility": {
+    "skipToMain": "Aller au contenu principal"
   }
 }

@@ -8,15 +8,9 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import NotificationDropdown from "@/components/NotificationDropdown";
-
-const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/workers", label: "Workers" },
-  { href: "/about", label: "About" },
-];
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -48,6 +42,7 @@ function NavLink({ href, label, onClick }: { href: string; label: string; onClic
 
 function ThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
+  const t = useTranslations("nav");
   return (
     <button
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
@@ -55,7 +50,7 @@ function ThemeToggle({ className }: { className?: string }) {
         "rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 min-w-[40px] min-h-[40px] flex items-center justify-center",
         className
       )}
-      aria-label="Toggle theme"
+      aria-label={t("theme")}
     >
       {resolvedTheme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
     </button>
@@ -68,12 +63,11 @@ export default function Navbar() {
   const router = useRouter();
   const locale = useLocale();
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Close menu on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  // Swipe-to-close gesture
   const touchStartX = useRef<number | null>(null);
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -81,7 +75,7 @@ export default function Navbar() {
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
     const delta = e.changedTouches[0].clientX - touchStartX.current;
-    if (delta > 60) setMobileOpen(false); // swipe right to close
+    if (delta > 60) setMobileOpen(false);
     touchStartX.current = null;
   };
 
@@ -92,26 +86,28 @@ export default function Navbar() {
     setMobileOpen(false);
   };
 
+  const NAV_LINKS = [
+    { href: "/", label: t("home") },
+    { href: "/workers", label: t("workers") },
+    { href: "/about", label: t("about") },
+  ];
+
   return (
     <>
       <nav className="sticky top-0 z-50 w-full border-b bg-white/90 backdrop-blur dark:bg-gray-900/90 dark:border-gray-800">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-          {/* Brand */}
           <Link href="/" className="text-xl font-bold text-blue-600">
             BlueCollar
           </Link>
 
-          {/* Desktop nav */}
           <div className="hidden items-center gap-6 md:flex">
             {NAV_LINKS.map((l) => <NavLink key={l.href} {...l} />)}
           </div>
 
-          {/* Desktop actions */}
           <div className="hidden items-center gap-3 md:flex">
             <ThemeToggle />
             <NotificationDropdown />
 
-            {/* Language */}
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
                 <button className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-gray-200">
@@ -130,7 +126,6 @@ export default function Navbar() {
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
 
-            {/* Wallet */}
             {publicKey ? (
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
@@ -144,7 +139,7 @@ export default function Navbar() {
                           ? "bg-yellow-100 text-yellow-700"
                           : "bg-green-100 text-green-700"
                       )}>
-                        {network.toLowerCase().includes("test") ? "testnet" : "mainnet"}
+                        {network.toLowerCase().includes("test") ? t("testnet") : t("mainnet")}
                       </span>
                     )}
                     <ChevronDown size={13} />
@@ -155,7 +150,7 @@ export default function Navbar() {
                     <div className="px-3 py-2 text-xs text-gray-400 font-mono break-all">{publicKey}</div>
                     <DropdownMenu.Separator className="my-1 h-px bg-gray-100 dark:bg-gray-700" />
                     <DropdownMenu.Item onSelect={disconnect} className="cursor-pointer rounded px-3 py-2 text-red-600 hover:bg-red-50 outline-none dark:hover:bg-red-950">
-                      Disconnect Wallet
+                      {t("disconnectWallet")}
                     </DropdownMenu.Item>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
@@ -163,11 +158,10 @@ export default function Navbar() {
             ) : (
               <button onClick={connect} disabled={isConnecting} className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-gray-200">
                 <Wallet size={15} />
-                {isConnecting ? "Connecting…" : "Connect Wallet"}
+                {isConnecting ? t("connecting") : t("connectWallet")}
               </button>
             )}
 
-            {/* Auth */}
             {user ? (
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
@@ -179,52 +173,47 @@ export default function Navbar() {
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-[160px] rounded-md border bg-white p-1 shadow-md text-sm dark:bg-gray-900 dark:border-gray-700">
-                    <DropdownMenu.Item onSelect={() => router.push("/profile")} className="cursor-pointer rounded px-3 py-2 hover:bg-gray-100 outline-none dark:hover:bg-gray-800 dark:text-gray-200">Profile</DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => router.push("/profile")} className="cursor-pointer rounded px-3 py-2 hover:bg-gray-100 outline-none dark:hover:bg-gray-800 dark:text-gray-200">{t("profile")}</DropdownMenu.Item>
                     {(user.role === "curator" || user.role === "admin") && (
-                      <DropdownMenu.Item onSelect={() => router.push("/dashboard")} className="cursor-pointer rounded px-3 py-2 hover:bg-gray-100 outline-none dark:hover:bg-gray-800 dark:text-gray-200">Dashboard</DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => router.push("/dashboard")} className="cursor-pointer rounded px-3 py-2 hover:bg-gray-100 outline-none dark:hover:bg-gray-800 dark:text-gray-200">{t("dashboard")}</DropdownMenu.Item>
                     )}
                     {user.role === "admin" && (
-                      <DropdownMenu.Item onSelect={() => router.push("/dashboard/admin")} className="cursor-pointer rounded px-3 py-2 hover:bg-gray-100 outline-none dark:hover:bg-gray-800 dark:text-gray-200">Admin Analytics</DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => router.push("/dashboard/admin")} className="cursor-pointer rounded px-3 py-2 hover:bg-gray-100 outline-none dark:hover:bg-gray-800 dark:text-gray-200">{t("adminAnalytics")}</DropdownMenu.Item>
                     )}
                     <DropdownMenu.Separator className="my-1 h-px bg-gray-100 dark:bg-gray-700" />
-                    <DropdownMenu.Item onSelect={logout} className="cursor-pointer rounded px-3 py-2 text-red-600 hover:bg-red-50 outline-none dark:hover:bg-red-950">Logout</DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={logout} className="cursor-pointer rounded px-3 py-2 text-red-600 hover:bg-red-50 outline-none dark:hover:bg-red-950">{t("logout")}</DropdownMenu.Item>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
             ) : (
               <>
-                <Link href="/auth/login" className="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200">Login</Link>
-                <Link href="/auth/register" className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">Register</Link>
+                <Link href="/auth/login" className="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200">{t("login")}</Link>
+                <Link href="/auth/register" className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">{t("register")}</Link>
               </>
             )}
           </div>
 
-          {/* Mobile hamburger */}
           <button
             className="md:hidden flex items-center justify-center rounded-md p-2 min-w-[44px] min-h-[44px] hover:bg-gray-100 dark:hover:bg-gray-800"
             onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
+            aria-label={t("openMenu")}
           >
             <Menu size={22} />
           </button>
         </div>
       </nav>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="md:hidden">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40 bg-black/40 animate-fade-in"
             onClick={() => setMobileOpen(false)}
           />
-          {/* Slide-in panel */}
           <div
             className="fixed right-0 top-0 z-50 h-full w-72 bg-white dark:bg-gray-900 shadow-xl flex flex-col animate-slide-in-right"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b dark:border-gray-800">
               <span className="text-lg font-bold text-blue-600">BlueCollar</span>
               <div className="flex items-center gap-1">
@@ -232,16 +221,14 @@ export default function Navbar() {
                 <button
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center rounded-md p-2 min-w-[44px] min-h-[44px] text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  aria-label="Close menu"
+                  aria-label={t("closeMenu")}
                 >
                   <X size={20} />
                 </button>
               </div>
             </div>
 
-            {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1">
-              {/* Nav links — large touch targets with active indicator */}
               {NAV_LINKS.map(({ href, label }) => {
                 const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
                 return (
@@ -264,8 +251,7 @@ export default function Navbar() {
 
               <div className="my-2 h-px bg-gray-100 dark:bg-gray-800" />
 
-              {/* Language */}
-              <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Language</p>
+              <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t("language")}</p>
               {LANGUAGES.map((lang) => (
                 <button
                   key={lang.code}
@@ -284,7 +270,6 @@ export default function Navbar() {
 
               <div className="my-2 h-px bg-gray-100 dark:bg-gray-800" />
 
-              {/* Wallet */}
               {publicKey ? (
                 <>
                   <div className="flex items-center gap-3 rounded-lg border px-4 py-3 text-sm min-h-[48px] dark:border-gray-700 dark:text-gray-200">
@@ -297,7 +282,7 @@ export default function Navbar() {
                           ? "bg-yellow-100 text-yellow-700"
                           : "bg-green-100 text-green-700"
                       )}>
-                        {network.toLowerCase().includes("test") ? "testnet" : "mainnet"}
+                        {network.toLowerCase().includes("test") ? t("testnet") : t("mainnet")}
                       </span>
                     )}
                   </div>
@@ -305,7 +290,7 @@ export default function Navbar() {
                     onClick={() => { disconnect(); setMobileOpen(false); }}
                     className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors w-full text-left"
                   >
-                    Disconnect Wallet
+                    {t("disconnectWallet")}
                   </button>
                 </>
               ) : (
@@ -315,40 +300,39 @@ export default function Navbar() {
                   className="flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium min-h-[48px] hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors"
                 >
                   <Wallet size={16} />
-                  {isConnecting ? "Connecting…" : "Connect Wallet"}
+                  {isConnecting ? t("connecting") : t("connectWallet")}
                 </button>
               )}
 
               <div className="my-2 h-px bg-gray-100 dark:bg-gray-800" />
 
-              {/* Auth */}
               {user ? (
                 <>
                   <Link href="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors">
                     <User size={16} className="text-gray-400" />
-                    Profile
+                    {t("profile")}
                   </Link>
                   {(user.role === "curator" || user.role === "admin") && (
                     <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors">
-                      Dashboard
+                      {t("dashboard")}
                     </Link>
                   )}
                   {user.role === "admin" && (
                     <Link href="/dashboard/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors">
-                      Admin Analytics
+                      {t("adminAnalytics")}
                     </Link>
                   )}
                   <button onClick={() => { logout(); setMobileOpen(false); }} className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors w-full text-left">
-                    Logout
+                    {t("logout")}
                   </button>
                 </>
               ) : (
                 <div className="flex flex-col gap-2 pt-1">
                   <Link href="/auth/login" onClick={() => setMobileOpen(false)} className="rounded-lg border px-4 py-3 text-center text-sm font-medium min-h-[48px] hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors">
-                    Login
+                    {t("login")}
                   </Link>
                   <Link href="/auth/register" onClick={() => setMobileOpen(false)} className="rounded-lg bg-blue-600 px-4 py-3 text-center text-sm font-medium min-h-[48px] text-white hover:bg-blue-700 transition-colors">
-                    Register
+                    {t("register")}
                   </Link>
                 </div>
               )}

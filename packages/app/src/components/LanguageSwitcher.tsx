@@ -1,17 +1,26 @@
-import { useLocale } from 'next-intl'
+'use client'
+
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, usePathname } from 'next/navigation'
+import { useEffect } from 'react'
 import { Button } from './ui/button'
+import { setLocale } from '@/lib/utils'
 
 export function LanguageSwitcher() {
   const locale = useLocale()
+  const t = useTranslations('languageSwitcher')
   const router = useRouter()
   const pathname = usePathname()
 
+  useEffect(() => {
+    setLocale(locale)
+  }, [locale])
+
   const languages = [
-    { code: 'en', label: 'English' },
-    { code: 'fr', label: 'Français' },
-    { code: 'es', label: 'Español' },
-    { code: 'pt', label: 'Português' },
+    { code: 'en', label: t('en') },
+    { code: 'fr', label: t('fr') },
+    { code: 'es', label: t('es') },
+    { code: 'pt', label: t('pt') },
   ]
 
   const handleLanguageChange = (newLocale: string) => {

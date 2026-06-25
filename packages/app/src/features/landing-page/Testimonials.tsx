@@ -1,6 +1,7 @@
 'use client'
 
 import { Star } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 const TESTIMONIALS = [
   {
@@ -30,15 +31,17 @@ const TESTIMONIALS = [
 ]
 
 export default function Testimonials() {
+  const t = useTranslations('testimonials')
+
   return (
     <section className="py-16 px-4 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-            Trusted by Workers & Customers
+            {t('title')}
           </h2>
           <p className="text-lg text-gray-600 dark:text-gray-400">
-            See what people are saying about BlueCollar
+            {t('subtitle')}
           </p>
         </div>
 
@@ -71,7 +74,7 @@ export default function Testimonials() {
               </div>
 
               <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
-                "{testimonial.content}"
+                &ldquo;{testimonial.content}&rdquo;
               </p>
             </div>
           ))}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -9,6 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
+  const t = useTranslations("installPrompt");
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [installed, setInstalled] = useState(false);
@@ -66,16 +68,16 @@ export default function InstallPrompt() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 dark:text-white">
-            Install BlueCollar
+            {t("install")}
           </p>
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            Get the best experience with our app
+            {t("description")}
           </p>
         </div>
         <button
           onClick={handleDismiss}
           className="flex shrink-0 items-center justify-center rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-          aria-label="Dismiss install prompt"
+          aria-label={t("dismiss")}
         >
           <X size={16} />
         </button>
@@ -85,13 +87,13 @@ export default function InstallPrompt() {
           onClick={handleDismiss}
           className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
         >
-          Not now
+          {t("notNow")}
         </button>
         <button
           onClick={handleInstall}
           className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
         >
-          Install
+          {t("install")}
         </button>
       </div>
     </div>

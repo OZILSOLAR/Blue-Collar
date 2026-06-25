@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 
 interface Category {
   id: string
@@ -18,18 +19,25 @@ async function getCategories(): Promise<Category[]> {
 
 export default async function Categories() {
   const categories = await getCategories()
+  const t = await getTranslations('categories')
 
   return (
-    <section>
-      <h2>Browse by Category</h2>
-      <div className="categories-grid">
-        {categories.map((cat) => (
-          <Link key={cat.id} href={`/workers?category=${cat.id}`} className="category-card">
-            {cat.icon && <span className="category-icon">{cat.icon}</span>}
-            <span className="category-name">{cat.name}</span>
-            <span className="category-badge">{cat._count.workers} workers</span>
-          </Link>
-        ))}
+    <section className="px-4 py-12">
+      <div className="mx-auto max-w-6xl">
+        <h2 className="mb-8 text-2xl font-bold text-gray-900 dark:text-gray-100">{t('title')}</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {categories.map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/workers?category=${cat.id}`}
+              className="flex flex-col items-center gap-2 rounded-xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-5 hover:shadow-md hover:border-blue-300 transition-all text-center"
+            >
+              {cat.icon && <span className="text-2xl">{cat.icon}</span>}
+              <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">{cat.name}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">{t('workersCount', { count: cat._count.workers })}</span>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   )

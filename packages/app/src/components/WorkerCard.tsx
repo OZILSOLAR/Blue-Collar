@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { BadgeCheck, MapPin, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Worker } from "@/types";
 import BookmarkButton from "./BookmarkButton";
 import StarRating from "./StarRating";
@@ -14,6 +15,7 @@ interface WorkerCardProps {
 }
 
 export default function WorkerCard({ worker, variant = "standard" }: WorkerCardProps) {
+  const t = useTranslations("workerCard");
   const { toggle, isSelected, isFull } = useCompare();
   const checked = isSelected(worker.id);
 
@@ -47,7 +49,7 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
             <div className="flex items-center gap-1 font-semibold text-gray-800 truncate text-sm">
               <span className="truncate">{worker.name}</span>
               {worker.isVerified && (
-                <BadgeCheck size={14} className="shrink-0 text-blue-500" aria-label="Verified" />
+                <BadgeCheck size={14} className="shrink-0 text-blue-500" aria-label={t("verified")} />
               )}
             </div>
             <span className="text-xs text-gray-500">{worker.category.name}</span>
@@ -71,7 +73,7 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
         {/* Featured badge */}
         <div className="absolute top-3 right-3 flex items-center gap-1 bg-blue-600 text-white px-2 py-1 rounded-full text-xs font-semibold">
           <Zap size={12} />
-          Featured
+          {t("featured")}
         </div>
 
         {/* Compare checkbox */}
@@ -87,7 +89,7 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
             className="h-4 w-4 rounded border-gray-300 accent-blue-600 cursor-pointer disabled:cursor-not-allowed"
             aria-label={`Compare ${worker.name}`}
           />
-          <span className="text-xs text-gray-500 select-none">Compare</span>
+          <span className="text-xs text-gray-500 select-none">{t("compare")}</span>
         </label>
 
         <Link href={`/workers/${worker.id}`} className="flex flex-col gap-4">
@@ -127,7 +129,7 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
               <span className="font-semibold text-gray-800">
                 {worker.averageRating.toFixed(1)}
               </span>
-              <span className="text-sm text-gray-500">({worker.reviewCount} reviews)</span>
+              <span className="text-sm text-gray-500">({worker.reviewCount} {t("reviews")})</span>
             </div>
           )}
 
@@ -146,8 +148,8 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
 
           <div className="mt-auto pt-2">
             <span className="inline-block w-full rounded-lg bg-blue-600 py-2.5 text-center text-sm font-semibold text-white transition-colors group-hover:bg-blue-700">
-              View Profile
-            </span>
+                {t("viewProfile")}
+              </span>
           </div>
         </Link>
       </div>
@@ -228,7 +230,7 @@ export default function WorkerCard({ worker, variant = "standard" }: WorkerCardP
 
         <div className="mt-auto pt-1">
           <span className="inline-block w-full rounded-md border border-blue-600 py-1.5 text-center text-sm font-medium text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
-            View Profile
+            {t("viewProfile")}
           </span>
         </div>
       </Link>

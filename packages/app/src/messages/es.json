@@ -16,7 +16,46 @@
     "save": "Guardar",
     "delete": "Eliminar",
     "edit": "Editar",
-    "back": "Atrás"
+    "back": "Atrás",
+    "close": "Cerrar",
+    "tryAgain": "Intentar de nuevo"
+  },
+  "nav": {
+    "home": "Inicio",
+    "workers": "Trabajadores",
+    "about": "Acerca de",
+    "language": "Idioma",
+    "theme": "Cambiar tema",
+    "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú",
+    "profile": "Perfil",
+    "dashboard": "Panel de control",
+    "adminAnalytics": "Analíticas de administrador",
+    "connectWallet": "Conectar billetera",
+    "connecting": "Conectando…",
+    "disconnectWallet": "Desconectar billetera",
+    "testnet": "testnet",
+    "mainnet": "mainnet"
+  },
+  "hero": {
+    "title": "Encuentra trabajadores calificados cerca de ti",
+    "subtitle": "Conéctate con artesanos locales de confianza — plomeros, electricistas, carpinteros y más. Pagos seguros impulsados por la blockchain Stellar.",
+    "categoryPlaceholder": "Categoría (ej. Plomero)",
+    "locationPlaceholder": "Ubicación (ej. Ciudad de México)",
+    "browseWorkers": "Explorar trabajadores",
+    "getStarted": "Comenzar",
+    "browseAll": "Ver todos los trabajadores",
+    "ariaCategory": "Categoría de trabajador",
+    "ariaLocation": "Ubicación"
+  },
+  "footer": {
+    "description": "Encuentra trabajadores calificados cerca de ti. Un protocolo descentralizado que conecta a artesanos locales con las comunidades que los necesitan.",
+    "quickLinks": "Enlaces rápidos",
+    "legal": "Legal",
+    "privacyPolicy": "Política de privacidad",
+    "termsOfService": "Términos del servicio",
+    "community": "Comunidad",
+    "copyright": "© {year} BlueCollar. Todos los derechos reservados."
   },
   "workers": {
     "title": "Encontrar trabajadores calificados",
@@ -47,5 +86,148 @@
     "contactRequests": "Solicitudes de contacto",
     "createWorker": "Crear trabajador",
     "noWorkers": "Sin trabajadores aún"
+  },
+  "workerCard": {
+    "viewProfile": "Ver perfil",
+    "compare": "Comparar",
+    "featured": "Destacado",
+    "verified": "Verificado",
+    "reviews": "reseñas",
+    "compareAria": "Comparar {name}",
+    "bookmarkAdd": "Guardar trabajador",
+    "bookmarkRemove": "Eliminar marcador"
+  },
+  "contact": {
+    "title": "Contactar a {name}",
+    "description": "Envía un mensaje para ponerte en contacto.",
+    "messageLabel": "Tu mensaje",
+    "messagePlaceholder": "Hola {name}, me gustaría hablar...",
+    "messageSent": "¡Mensaje enviado!",
+    "messageSentDescription": "{name} será notificado y puede comunicarse contigo.",
+    "errorEmpty": "El mensaje no puede estar vacío.",
+    "errorTooShort": "El mensaje debe tener al menos 10 caracteres.",
+    "errorTooLong": "El mensaje debe tener menos de 1000 caracteres.",
+    "errorRateLimit": "Has enviado demasiados mensajes. Espera antes de intentar de nuevo.",
+    "errorGeneric": "Error al enviar el mensaje.",
+    "ariaClose": "Cerrar diálogo",
+    "charCount": "{count}/1000"
+  },
+  "tip": {
+    "title": "Enviar propina",
+    "description": "Recompensa a {name} por un servicio excelente",
+    "recipient": "Destinatario",
+    "amount": "Cantidad",
+    "token": "Token",
+    "tokenXlm": "XLM (Stellar Lumens)",
+    "tokenUsdc": "USDC (USD Coin)",
+    "amountLabel": "Cantidad ({token})",
+    "networkFee": "Tarifa de red",
+    "total": "Total",
+    "waitingForSignature": "Esperando firma",
+    "pleaseConfirm": "Por favor confirma en tu billetera Freighter",
+    "processing": "Procesando transacción",
+    "broadcasting": "Transmitiendo a la red Stellar…",
+    "successTitle": "¡Propina enviada con éxito!",
+    "successDescription": "{name} ha recibido tu propina",
+    "viewOnExplorer": "Ver en Stellar Expert",
+    "freighterNotFound": "Freighter no encontrado",
+    "freighterDescription": "Instala la extensión Freighter para enviar propinas",
+    "downloadFreighter": "Descargar Freighter",
+    "insufficientBalance": "Saldo insuficiente",
+    "insufficientBalanceDesc": "No tienes suficiente {token} para enviar esta propina",
+    "tryDifferentAmount": "Prueba con un monto diferente",
+    "transactionFailed": "Transacción fallida",
+    "tryAgain": "Intentar de nuevo",
+    "signing": "Firmando…",
+    "ariaClose": "Cerrar diálogo"
+  },
+  "search": {
+    "placeholder": "Buscar trabajadores por nombre o habilidad...",
+    "ariaLabel": "Buscar trabajadores",
+    "clear": "Limpiar búsqueda"
+  },
+  "filters": {
+    "title": "Filtros",
+    "clearAll": "Limpiar todo",
+    "category": "Categoría",
+    "allCategories": "Todas las categorías",
+    "location": "Ubicación",
+    "cityPlaceholder": "Ciudad...",
+    "statePlaceholder": "Estado / Región...",
+    "mobileTrigger": "Filtros",
+    "mobileTitle": "Filtrar trabajadores",
+    "showResults": "Mostrar resultados",
+    "activeSearch": "Búsqueda: \"{query}\"",
+    "activeCategory": "Categoría: {name}",
+    "activeCity": "Ciudad: {name}",
+    "activeState": "Estado: {name}",
+    "removeFilter": "Eliminar filtro: {label}"
+  },
+  "workersDiscovery": {
+    "searchPlaceholder": "Buscar trabajadores por nombre o habilidad...",
+    "noResults": "Sin resultados",
+    "resultsFound": "{count, plural, one {# trabajador encontrado} other {# trabajadores encontrados}}",
+    "errorTitle": "Algo salió mal",
+    "emptyTitle": "No se encontraron trabajadores",
+    "emptyDescription": "Intenta ampliar tu búsqueda o eliminar algunos filtros.",
+    "clearAllFilters": "Limpiar todos los filtros"
+  },
+  "offline": {
+    "offline": "Estás fuera de línea",
+    "syncing": "{count, plural, one {Sincronizando # cambio...} other {Sincronizando # cambios...}}",
+    "pending": "{count, plural, one {# cambio pendiente} other {# cambios pendientes}}"
+  },
+  "installPrompt": {
+    "install": "Instalar BlueCollar",
+    "description": "Obtén la mejor experiencia con nuestra aplicación",
+    "notNow": "Ahora no",
+    "dismiss": "Descartar aviso de instalación"
+  },
+  "categories": {
+    "title": "Explorar por categoría",
+    "workersCount": "{count} trabajadores"
+  },
+  "featuredWorkers": {
+    "title": "Trabajadores destacados",
+    "empty": "No hay trabajadores disponibles aún. Vuelve pronto.",
+    "seeAll": "Ver todos los trabajadores"
+  },
+  "howItWorks": {
+    "title": "Cómo funciona",
+    "step1Title": "Buscar una habilidad",
+    "step1Desc": "Explora categorías o busca por habilidad y ubicación para encontrar al artesano adecuado.",
+    "step2Title": "Encuentra un trabajador verificado",
+    "step2Desc": "Cada listado es curado por la comunidad y anclado en la cadena para transparencia.",
+    "step3Title": "Paga de forma segura en la cadena",
+    "step3Desc": "Envía propinas y pagos directamente a los trabajadores a través de Stellar — sin intermediarios."
+  },
+  "testimonials": {
+    "title": "Confiado por trabajadores y clientes",
+    "subtitle": "Descubre lo que la gente dice sobre BlueCollar"
+  },
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "pageAria": "Página {page}"
+  },
+  "errors": {
+    "genericTitle": "Algo salió mal",
+    "genericDescription": "Ocurrió un error inesperado. Por favor intenta de nuevo.",
+    "reportError": "Reportar este error",
+    "reportDescription": "Ayúdanos a solucionar este problema enviando un informe.",
+    "apiDefault": "Ocurrió un error inesperado.",
+    "apiNetwork": "No se puede conectar. Verifica tu conexión a Internet.",
+    "apiUnauthorized": "Tu sesión ha expirado. Inicia sesión nuevamente.",
+    "apiNotFound": "El recurso solicitado no fue encontrado.",
+    "apiValidation": "Por favor verifica tus datos e intenta de nuevo."
+  },
+  "languageSwitcher": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "pt": "Português"
+  },
+  "accessibility": {
+    "skipToMain": "Saltar al contenido principal"
   }
 }

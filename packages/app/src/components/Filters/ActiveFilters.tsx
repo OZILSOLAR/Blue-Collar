@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Category } from "@/types";
 import type { FilterValues } from "./FilterPanel";
 
@@ -19,27 +20,28 @@ export default function ActiveFilters({
   onRemoveFilter,
   onClearSearch,
 }: ActiveFiltersProps) {
+  const t = useTranslations("filters");
   const chips: { label: string; onRemove: () => void }[] = [];
 
   if (search) {
-    chips.push({ label: `Search: "${search}"`, onRemove: onClearSearch });
+    chips.push({ label: t("activeSearch", { query: search }), onRemove: onClearSearch });
   }
   if (filters.category) {
     const cat = categories.find((c) => c.id === filters.category);
     chips.push({
-      label: `Category: ${cat?.name ?? filters.category}`,
+      label: t("activeCategory", { name: cat?.name ?? filters.category }),
       onRemove: () => onRemoveFilter("category"),
     });
   }
   if (filters.city) {
     chips.push({
-      label: `City: ${filters.city}`,
+      label: t("activeCity", { name: filters.city }),
       onRemove: () => onRemoveFilter("city"),
     });
   }
   if (filters.state) {
     chips.push({
-      label: `State: ${filters.state}`,
+      label: t("activeState", { name: filters.state }),
       onRemove: () => onRemoveFilter("state"),
     });
   }
@@ -58,7 +60,7 @@ export default function ActiveFilters({
             type="button"
             onClick={chip.onRemove}
             className="rounded-full p-0.5 hover:bg-blue-100"
-            aria-label={`Remove filter: ${chip.label}`}
+            aria-label={t("removeFilter", { label: chip.label })}
           >
             <X size={12} />
           </button>

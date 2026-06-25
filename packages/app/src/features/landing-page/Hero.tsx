@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 export default function Hero() {
   const router = useRouter()
+  const t = useTranslations('hero')
   const [category, setCategory] = useState('')
   const [location, setLocation] = useState('')
 
@@ -22,11 +24,10 @@ export default function Hero() {
     <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white px-4 py-24 sm:py-32 text-center">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-          Find Skilled Workers Near You
+          {t('title')}
         </h1>
         <p className="text-lg sm:text-xl text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
-          Connect with trusted local tradespeople — plumbers, electricians, carpenters, and more. 
-          Secure payments powered by Stellar blockchain.
+          {t('subtitle')}
         </p>
 
         <form
@@ -35,25 +36,25 @@ export default function Hero() {
         >
           <input
             type="text"
-            placeholder="Category (e.g. Plumber)"
+            placeholder={t('categoryPlaceholder')}
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             className="flex-1 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            aria-label="Worker category"
+            aria-label={t('ariaCategory')}
           />
           <input
             type="text"
-            placeholder="Location (e.g. Lagos)"
+            placeholder={t('locationPlaceholder')}
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             className="flex-1 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            aria-label="Location"
+            aria-label={t('ariaLocation')}
           />
           <button
             type="submit"
             className="rounded-lg bg-white text-blue-700 font-semibold px-6 py-3 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
           >
-            Browse Workers
+            {t('browseWorkers')}
             <ArrowRight size={18} />
           </button>
         </form>
@@ -63,14 +64,14 @@ export default function Hero() {
             href="/auth/register"
             className="inline-flex items-center gap-2 bg-white text-blue-700 font-semibold px-6 py-3 rounded-lg hover:bg-blue-50 transition-colors"
           >
-            Get Started
+            {t('getStarted')}
             <ArrowRight size={18} />
           </Link>
           <Link
             href="/workers"
             className="inline-flex items-center gap-2 border-2 border-white text-white font-semibold px-6 py-3 rounded-lg hover:bg-white/10 transition-colors"
           >
-            Browse All Workers
+            {t('browseAll')}
           </Link>
         </div>
       </div>

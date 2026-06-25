@@ -16,7 +16,46 @@
     "save": "Salvar",
     "delete": "Excluir",
     "edit": "Editar",
-    "back": "Voltar"
+    "back": "Voltar",
+    "close": "Fechar",
+    "tryAgain": "Tentar novamente"
+  },
+  "nav": {
+    "home": "Início",
+    "workers": "Trabalhadores",
+    "about": "Sobre",
+    "language": "Idioma",
+    "theme": "Alternar tema",
+    "openMenu": "Abrir menu",
+    "closeMenu": "Fechar menu",
+    "profile": "Perfil",
+    "dashboard": "Painel",
+    "adminAnalytics": "Análises de admin",
+    "connectWallet": "Conectar carteira",
+    "connecting": "Conectando…",
+    "disconnectWallet": "Desconectar carteira",
+    "testnet": "testnet",
+    "mainnet": "mainnet"
+  },
+  "hero": {
+    "title": "Encontre Trabalhadores Qualificados Perto de Você",
+    "subtitle": "Conecte-se com profissionais locais de confiança — encanadores, eletricistas, carpinteiros e mais. Pagamentos seguros com a blockchain Stellar.",
+    "categoryPlaceholder": "Categoria (ex. Encanador)",
+    "locationPlaceholder": "Local (ex. São Paulo)",
+    "browseWorkers": "Explorar Trabalhadores",
+    "getStarted": "Começar",
+    "browseAll": "Ver Todos os Trabalhadores",
+    "ariaCategory": "Categoria do trabalhador",
+    "ariaLocation": "Local"
+  },
+  "footer": {
+    "description": "Encontre trabalhadores qualificados perto de você. Um protocolo descentralizado conectando profissionais locais com as comunidades que precisam deles.",
+    "quickLinks": "Links rápidos",
+    "legal": "Legal",
+    "privacyPolicy": "Política de privacidade",
+    "termsOfService": "Termos de serviço",
+    "community": "Comunidade",
+    "copyright": "© {year} BlueCollar. Todos os direitos reservados."
   },
   "workers": {
     "title": "Encontre Trabalhadores Qualificados",
@@ -47,5 +86,148 @@
     "contactRequests": "Solicitações de Contato",
     "createWorker": "Criar Trabalhador",
     "noWorkers": "Nenhum trabalhador ainda"
+  },
+  "workerCard": {
+    "viewProfile": "Ver Perfil",
+    "compare": "Comparar",
+    "featured": "Destaque",
+    "verified": "Verificado",
+    "reviews": "avaliações",
+    "compareAria": "Comparar {name}",
+    "bookmarkAdd": "Adicionar aos favoritos",
+    "bookmarkRemove": "Remover dos favoritos"
+  },
+  "contact": {
+    "title": "Contatar {name}",
+    "description": "Envie uma mensagem para entrar em contato.",
+    "messageLabel": "Sua mensagem",
+    "messagePlaceholder": "Olá {name}, gostaria de discutir...",
+    "messageSent": "Mensagem enviada!",
+    "messageSentDescription": "{name} será notificado e poderá entrar em contato.",
+    "errorEmpty": "A mensagem não pode estar vazia.",
+    "errorTooShort": "A mensagem deve ter pelo menos 10 caracteres.",
+    "errorTooLong": "A mensagem deve ter menos de 1000 caracteres.",
+    "errorRateLimit": "Você enviou muitas mensagens. Aguarde antes de tentar novamente.",
+    "errorGeneric": "Falha ao enviar mensagem.",
+    "ariaClose": "Fechar diálogo",
+    "charCount": "{count}/1000"
+  },
+  "tip": {
+    "title": "Enviar Gorjeta",
+    "description": "Recompense {name} por um serviço excelente",
+    "recipient": "Destinatário",
+    "amount": "Valor",
+    "token": "Token",
+    "tokenXlm": "XLM (Stellar Lumens)",
+    "tokenUsdc": "USDC (USD Coin)",
+    "amountLabel": "Valor ({token})",
+    "networkFee": "Taxa de rede",
+    "total": "Total",
+    "waitingForSignature": "Aguardando assinatura",
+    "pleaseConfirm": "Por favor confirme na sua carteira Freighter",
+    "processing": "Processando transação",
+    "broadcasting": "Transmitindo para rede Stellar…",
+    "successTitle": "Gorjeta enviada com sucesso!",
+    "successDescription": "{name} recebeu sua gorjeta",
+    "viewOnExplorer": "Ver no Stellar Expert",
+    "freighterNotFound": "Freighter não encontrado",
+    "freighterDescription": "Instale a extensão Freighter para enviar gorjetas",
+    "downloadFreighter": "Baixar Freighter",
+    "insufficientBalance": "Saldo insuficiente",
+    "insufficientBalanceDesc": "Você não tem {token} suficiente para enviar esta gorjeta",
+    "tryDifferentAmount": "Tente um valor diferente",
+    "transactionFailed": "Transação falhou",
+    "tryAgain": "Tentar novamente",
+    "signing": "Assinando…",
+    "ariaClose": "Fechar diálogo"
+  },
+  "search": {
+    "placeholder": "Buscar trabalhadores por nome ou habilidade...",
+    "ariaLabel": "Buscar trabalhadores",
+    "clear": "Limpar busca"
+  },
+  "filters": {
+    "title": "Filtros",
+    "clearAll": "Limpar tudo",
+    "category": "Categoria",
+    "allCategories": "Todas as categorias",
+    "location": "Local",
+    "cityPlaceholder": "Cidade...",
+    "statePlaceholder": "Estado / Região...",
+    "mobileTrigger": "Filtros",
+    "mobileTitle": "Filtrar trabalhadores",
+    "showResults": "Mostrar resultados",
+    "activeSearch": "Busca: \"{query}\"",
+    "activeCategory": "Categoria: {name}",
+    "activeCity": "Cidade: {name}",
+    "activeState": "Estado: {name}",
+    "removeFilter": "Remover filtro: {label}"
+  },
+  "workersDiscovery": {
+    "searchPlaceholder": "Buscar trabalhadores por nome ou habilidade...",
+    "noResults": "Sem resultados",
+    "resultsFound": "{count, plural, one {# trabalhador encontrado} other {# trabalhadores encontrados}}",
+    "errorTitle": "Algo deu errado",
+    "emptyTitle": "Nenhum trabalhador encontrado",
+    "emptyDescription": "Tente ampliar sua busca ou remover alguns filtros.",
+    "clearAllFilters": "Limpar todos os filtros"
+  },
+  "offline": {
+    "offline": "Você está offline",
+    "syncing": "{count, plural, one {Sincronizando # alteração...} other {Sincronizando # alterações...}}",
+    "pending": "{count, plural, one {# alteração pendente} other {# alterações pendentes}}"
+  },
+  "installPrompt": {
+    "install": "Instalar BlueCollar",
+    "description": "Obtenha a melhor experiência com nosso aplicativo",
+    "notNow": "Agora não",
+    "dismiss": "Dispensar aviso de instalação"
+  },
+  "categories": {
+    "title": "Explorar por categoria",
+    "workersCount": "{count} trabalhadores"
+  },
+  "featuredWorkers": {
+    "title": "Trabalhadores em Destaque",
+    "empty": "Nenhum trabalhador disponível ainda. Volte em breve.",
+    "seeAll": "Ver Todos os Trabalhadores"
+  },
+  "howItWorks": {
+    "title": "Como Funciona",
+    "step1Title": "Pesquise por uma Habilidade",
+    "step1Desc": "Navegue por categorias ou pesquise por habilidade e local para encontrar o profissional certo.",
+    "step2Title": "Encontre um Trabalhador Verificado",
+    "step2Desc": "Cada listagem é curada pela comunidade e ancorada na blockchain para transparência.",
+    "step3Title": "Pague com Segurança na Blockchain",
+    "step3Desc": "Envie gorjetas e pagamentos diretamente aos trabalhadores via Stellar — sem intermediários."
+  },
+  "testimonials": {
+    "title": "Confiado por Trabalhadores e Clientes",
+    "subtitle": "Veja o que as pessoas estão dizendo sobre o BlueCollar"
+  },
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Próximo",
+    "pageAria": "Página {page}"
+  },
+  "errors": {
+    "genericTitle": "Algo deu errado",
+    "genericDescription": "Ocorreu um erro inesperado. Por favor tente novamente.",
+    "reportError": "Reportar este erro",
+    "reportDescription": "Ajude-nos a corrigir este problema enviando um relatório.",
+    "apiDefault": "Ocorreu um erro inesperado.",
+    "apiNetwork": "Não foi possível conectar. Verifique sua conexão com a Internet.",
+    "apiUnauthorized": "Sua sessão expirou. Faça login novamente.",
+    "apiNotFound": "O recurso solicitado não foi encontrado.",
+    "apiValidation": "Por favor verifique seus dados e tente novamente."
+  },
+  "languageSwitcher": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "pt": "Português"
+  },
+  "accessibility": {
+    "skipToMain": "Pular para o conteúdo principal"
   }
 }

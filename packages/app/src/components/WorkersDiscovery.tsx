@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
 import WorkerCard from "@/components/WorkerCard";
 import { WorkerCardSkeleton } from "@/components/Skeleton";
 import Pagination from "@/components/Pagination";
@@ -46,6 +46,8 @@ function paramsFromState(
 export default function WorkersDiscovery() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("workersDiscovery");
+  const commonT = useTranslations("common");
 
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [filters, setFilters] = useState<FilterValues>(
@@ -61,14 +63,12 @@ export default function WorkersDiscovery() {
 
   const debouncedSearch = useDebounce(search, 350);
 
-  // Load categories once
   useEffect(() => {
     getCategories()
       .then((res) => setCategories(res.data))
       .catch(() => {});
   }, []);
 
-  // Sync URL whenever debounced search, filters, or page change
   const syncUrl = useCallback(
     (s: string, f: FilterValues, p: number) => {
       const params = paramsFromState(s, f, p);
@@ -78,7 +78,6 @@ export default function WorkersDiscovery() {
     [router]
   );
 
-  // Fetch workers
   useEffect(() => {
     let cancelled = false;
     const params = paramsFromState(debouncedSearch, filters, page);
@@ -109,7 +108,6 @@ export default function WorkersDiscovery() {
     };
   }, [debouncedSearch, filters, page, syncUrl]);
 
-  // Reset to page 1 when search or filters change
   const handleSearch = useCallback((v: string) => {
     setSearch(v);
     setPage(1);
@@ -135,7 +133,6 @@ export default function WorkersDiscovery() {
 
   const resultCount = meta?.total ?? 0;
 
-  // Min-height on results to prevent layout shift during page transitions
   const gridMinHeight = useMemo(() => {
     if (loading) return "min-h-[600px]";
     return workers.length > 0 ? "min-h-[200px]" : "";
@@ -143,7 +140,6 @@ export default function WorkersDiscovery() {
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row">
-      {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 lg:block">
         <div className="sticky top-24">
           <FilterPanel
@@ -156,15 +152,13 @@ export default function WorkersDiscovery() {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1">
-        {/* Search bar + mobile filter toggle */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex-1">
             <SearchInput
               value={search}
               onChange={handleSearch}
-              placeholder="Search workers by name or skill..."
+              placeholder={t("searchPlaceholder")}
             />
           </div>
           <MobileFilterSheet
@@ -176,7 +170,6 @@ export default function WorkersDiscovery() {
           />
         </div>
 
-        {/* Active filter chips */}
         <ActiveFilters
           filters={filters}
           search={debouncedSearch}
@@ -185,20 +178,18 @@ export default function WorkersDiscovery() {
           onClearSearch={() => handleSearch("")}
         />
 
-        {/* Result count */}
         {!loading && !error && (
           <p className="mb-4 mt-2 text-sm text-gray-500">
             {resultCount === 0
-              ? "No results"
-              : `${resultCount} worker${resultCount !== 1 ? "s" : ""} found`}
+              ? t("noResults")
+              : t("resultsFound", { count: resultCount })}
           </p>
         )}
 
-        {/* Error state */}
         {error && (
           <div className="flex flex-col items-center justify-center rounded-xl border border-red-200 bg-red-50 py-16 text-center">
             <p className="text-lg font-semibold text-red-700">
-              Something went wrong
+              {t("errorTitle")}
             </p>
             <p className="mt-1 text-sm text-red-600">{error}</p>
             <button
@@ -206,12 +197,11 @@ export default function WorkersDiscovery() {
               onClick={() => setPage(page)}
               className="mt-4 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
-              Try again
+              {commonT("tryAgain")}
             </button>
           </div>
         )}
 
-        {/* Loading state */}
         {loading && (
           <div
             className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${gridMinHeight}`}
@@ -222,14 +212,13 @@ export default function WorkersDiscovery() {
           </div>
         )}
 
-        {/* Empty state */}
         {!loading && !error && workers.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-xl border bg-white py-20 text-center shadow-sm">
             <p className="text-lg font-semibold text-gray-700">
-              No workers found
+              {t("emptyTitle")}
             </p>
             <p className="mt-1 text-sm text-gray-500">
-              Try broadening your search or removing some filters.
+              {t("emptyDescription")}
             </p>
             <button
               type="button"
@@ -239,12 +228,11 @@ export default function WorkersDiscovery() {
               }}
               className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              Clear all filters
+              {t("clearAllFilters")}
             </button>
           </div>
         )}
 
-        {/* Results grid */}
         {!loading && !error && workers.length > 0 && (
           <>
             <div
@@ -255,7 +243,6 @@ export default function WorkersDiscovery() {
               ))}
             </div>
 
-            {/* Pagination */}
             {meta && meta.pages > 1 && (
               <div className="mt-8">
                 <Pagination

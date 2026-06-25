@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Heart } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toggleBookmark } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ export default function BookmarkButton({
   initialBookmarked = false,
   className,
 }: BookmarkButtonProps) {
+  const t = useTranslations("workerCard");
   const [bookmarked, setBookmarked] = useState(initialBookmarked);
   const [loading, setLoading] = useState(false);
 
@@ -42,7 +44,7 @@ export default function BookmarkButton({
   return (
     <button
       onClick={handleClick}
-      aria-label={bookmarked ? "Remove bookmark" : "Bookmark worker"}
+      aria-label={bookmarked ? t("bookmarkRemove") : t("bookmarkAdd")}
       className={cn(
         "rounded-full p-1.5 transition-colors",
         bookmarked

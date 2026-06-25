@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useTranslations } from "next-intl";
 import type { Category } from "@/types";
 import FilterPanel, { type FilterValues } from "./FilterPanel";
 
@@ -21,6 +22,7 @@ export default function MobileFilterSheet({
   onReset,
   loading,
 }: MobileFilterSheetProps) {
+  const t = useTranslations("filters");
   const [open, setOpen] = useState(false);
 
   const activeCount = [filters.category, filters.city, filters.state].filter(
@@ -35,7 +37,7 @@ export default function MobileFilterSheet({
           className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 lg:hidden"
         >
           <SlidersHorizontal size={15} />
-          Filters
+          {t("mobileTrigger")}
           {activeCount > 0 && (
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs text-white">
               {activeCount}
@@ -47,7 +49,7 @@ export default function MobileFilterSheet({
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Dialog.Content className="fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] overflow-y-auto bg-gray-50 p-4 shadow-xl">
           <Dialog.Title className="mb-4 text-lg font-bold text-gray-800">
-            Filter Workers
+            {t("mobileTitle")}
           </Dialog.Title>
           <FilterPanel
             filters={filters}
@@ -61,7 +63,7 @@ export default function MobileFilterSheet({
             onClick={() => setOpen(false)}
             className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
           >
-            Show Results
+            {t("showResults")}
           </button>
         </Dialog.Content>
       </Dialog.Portal>

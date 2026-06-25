@@ -1,6 +1,7 @@
 "use client";
 
 import { SlidersHorizontal, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Category } from "@/types";
 
 export interface FilterValues {
@@ -30,6 +31,7 @@ export default function FilterPanel({
   onReset,
   loading,
 }: FilterPanelProps) {
+  const t = useTranslations("filters");
   const hasActiveFilters = filters.category || filters.city || filters.state;
 
   const update = (key: keyof FilterValues, value: string) => {
@@ -41,7 +43,7 @@ export default function FilterPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
           <SlidersHorizontal size={15} />
-          Filters
+          {t("title")}
         </div>
         {hasActiveFilters && (
           <button
@@ -50,15 +52,14 @@ export default function FilterPanel({
             className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
           >
             <X size={12} />
-            Clear all
+            {t("clearAll")}
           </button>
         )}
       </div>
 
-      {/* Category */}
       <fieldset disabled={loading}>
         <legend className="mb-2 text-sm font-medium text-gray-700">
-          Category
+          {t("category")}
         </legend>
         <div className="flex flex-col gap-1.5">
           <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
@@ -70,7 +71,7 @@ export default function FilterPanel({
               onChange={() => update("category", "")}
               className="accent-blue-600"
             />
-            All categories
+            {t("allCategories")}
           </label>
           {categories.map((c) => (
             <label
@@ -91,24 +92,23 @@ export default function FilterPanel({
         </div>
       </fieldset>
 
-      {/* Location */}
       <fieldset disabled={loading}>
         <legend className="mb-2 text-sm font-medium text-gray-700">
-          Location
+          {t("location")}
         </legend>
         <div className="flex flex-col gap-3">
           <input
             type="text"
             value={filters.city}
             onChange={(e) => update("city", e.target.value)}
-            placeholder="City..."
+            placeholder={t("cityPlaceholder")}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
           />
           <input
             type="text"
             value={filters.state}
             onChange={(e) => update("state", e.target.value)}
-            placeholder="State / Region..."
+            placeholder={t("statePlaceholder")}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
           />
         </div>

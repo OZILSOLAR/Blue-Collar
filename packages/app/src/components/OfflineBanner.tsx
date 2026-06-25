@@ -3,22 +3,23 @@
 import { useEffect, useState } from "react";
 import { WifiOff, Loader2 } from "lucide-react";
 import { getOfflineQueue } from "@/lib/offlineQueue";
+import { useTranslations } from "next-intl";
 
 export default function OfflineBanner() {
+  const t = useTranslations("offline");
   const [offline, setOffline] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     setOffline(!navigator.onLine);
-    
+
     const on = () => setOffline(false);
     const off = () => setOffline(true);
-    
+
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
 
-    // Listen for sync messages from service worker
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.controller?.postMessage({
         type: "GET_QUEUE_COUNT",
@@ -35,7 +36,6 @@ export default function OfflineBanner() {
       };
     }
 
-    // Check queue on mount and periodically
     const checkQueue = async () => {
       try {
         const queue = await getOfflineQueue();
@@ -57,12 +57,12 @@ export default function OfflineBanner() {
 
   if (!offline && queueCount === 0) return null;
 
-  const statusText = offline 
-    ? "You're offline"
+  const statusText = offline
+    ? t("offline")
     : syncing
-    ? `Syncing ${queueCount} change${queueCount !== 1 ? "s" : ""}...`
+    ? t("syncing", { count: queueCount })
     : queueCount > 0
-    ? `${queueCount} change${queueCount !== 1 ? "s" : ""} pending`
+    ? t("pending", { count: queueCount })
     : null;
 
   if (!statusText) return null;
