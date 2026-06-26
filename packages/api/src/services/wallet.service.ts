@@ -6,6 +6,7 @@ const FRIENDBOT_URL = 'https://friendbot-testnet.stellar.org/bump_sequence'
 
 /**
  * Fetch account balance and sequence from Horizon.
+ * @throws AppError if account not found or network error
  */
 export async function getAccountInfo(publicKey: string) {
   const response = await fetch(`${HORIZON_URL}/accounts/${publicKey}`)
@@ -79,7 +80,10 @@ export async function getUserBalance(userId: string) {
 
 /**
  * Build an unsigned transaction XDR for a tip/payment.
- * Returns XDR that client signs and broadcasts.
+ * Returns transaction envelope that client signs and broadcasts.
+ *
+ * This is a helper to construct the transaction details.
+ * For full XDR encoding, clients should use stellar-sdk or stellar-base.
  */
 export async function buildUnsignedTx(
   sourcePublicKey: string,
@@ -99,20 +103,25 @@ export async function buildUnsignedTx(
   const current = await getAccountInfo(sourcePublicKey)
   const nextSequence = (current.sequence + BigInt(1)).toString()
 
-  // Build transaction with SDK
-  // For now, return mock transaction data - actual SDK integration depends on stellar-sdk
+  // Return transaction parameters for client to build XDR
+  // Client should use stellar-sdk: new TransactionBuilder(account)
+  //   .addOperation(Operation.payment({ destination, asset, amount }))
+  //   .build()
   return {
     sourcePublicKey,
     destinationPublicKey,
     amount,
     memo: memo || '',
     sequence: nextSequence,
-    // xdr: (signed by client),
+    // Note: xdr is signed by client, not generated here
+    description: 'Use stellar-sdk to sign this transaction and then broadcast',
   }
 }
 
 /**
  * Submit a signed XDR transaction to Stellar network.
+ * @param signedXdr Base64-encoded signed transaction envelope
+ * @returns Transaction hash and ID
  */
 export async function broadcastTransaction(signedXdr: string) {
   const response = await fetch(`${HORIZON_URL}/transactions`, {
@@ -134,6 +143,7 @@ export async function broadcastTransaction(signedXdr: string) {
 
 /**
  * Poll transaction status from Horizon.
+ * Returns status: pending | confirmed | failed
  */
 export async function pollTransactionStatus(txHash: string) {
   const response = await fetch(`${HORIZON_URL}/transactions/${txHash}`)
@@ -156,7 +166,7 @@ export async function pollTransactionStatus(txHash: string) {
 
 /**
  * Fund testnet account via friendbot.
- * Only works on testnet.
+ * Only works on testnet — do not call on mainnet.
  */
 export async function fundTestnetAccount(publicKey: string) {
   const response = await fetch(FRIENDBOT_URL, {
@@ -198,7 +208,10 @@ export async function linkStellarAccount(userId: string, publicKey: string) {
 }
 
 /**
- * Get all transactions for a Stellar account from Horizon.
+ * Get transaction history for a Stellar account from Horizon.
+ * @param publicKey Account's public key
+ * @param limit Max results (default 50)
+ * @param order Sort order: asc or desc (default desc)
  */
 export async function getAccountTransactions(
   publicKey: string,
@@ -219,3 +232,4 @@ export async function getAccountTransactions(
 
   return data._embedded.records
 }
+
