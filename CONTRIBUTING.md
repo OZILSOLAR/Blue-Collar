@@ -9,9 +9,11 @@ Thanks for your interest in contributing! This guide covers everything you need 
 - [Getting Started](#getting-started)
 - [Commit Message Convention](#commit-message-convention)
 - [Branch Naming](#branch-naming)
+- [Issue & PR Templates](#issue--pr-templates)
 - [Pull Request Process](#pull-request-process)
 - [Code Style](#code-style)
 - [Running Tests](#running-tests)
+- [Translations](#translations)
 
 ---
 
@@ -50,7 +52,8 @@ This project uses **Conventional Commits** to power automated changelog generati
 | ---------- | -------------------------------------------------------- |
 | `feat`     | A new feature                                            |
 | `fix`      | A bug fix                                                |
-| `docs`     | Documentation changes only                              |
+| `docs`     | Documentation changes only                               |
+| `i18n`     | Translations and localization                            |
 | `refactor` | Code change that neither fixes a bug nor adds a feature  |
 | `test`     | Adding or updating tests                                 |
 | `chore`    | Build process, dependency updates, tooling               |
@@ -103,6 +106,19 @@ Examples:
 - `chore/bump-prisma`
 
 ---
+
+## Issue & PR Templates
+
+This repository provides structured templates for issues and pull requests:
+
+| Template | File | When to Use |
+|---|---|---|
+| Bug Report | `.github/ISSUE_TEMPLATE/bug_report.yml` | Reporting a bug |
+| Feature Request | `.github/ISSUE_TEMPLATE/feature_request.yml` | Suggesting a new feature |
+| Documentation | `.github/ISSUE_TEMPLATE/documentation.yml` | Documentation issues or improvements |
+| Pull Request | `.github/pull_request_template.md` | Opening a new PR |
+
+Fill in all relevant sections. The templates include checklists specific to the type of change so reviewers can verify compliance quickly.
 
 ## Pull Request Process
 
@@ -173,3 +189,16 @@ cargo test
 cd packages/app
 pnpm test
 ```
+
+---
+
+## Translations
+
+See [docs/i18n-translations.md](./docs/i18n-translations.md) for contributing translations to the app UI and README files. This includes:
+
+- Adding a new language to the Next.js frontend (message JSON files)
+- Translating README files to new languages
+- Keeping translations in sync with the English source
+- Validating translation completeness
+
+Translation PRs should use the `i18n:` commit type and reference the language being added.

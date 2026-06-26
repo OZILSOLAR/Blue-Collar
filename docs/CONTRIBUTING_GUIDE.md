@@ -337,27 +337,38 @@ make test
 git push origin fix/worker-toggle-auth
 ```
 
-Then open a pull request on GitHub against the `main` branch. Use this PR template:
+Then open a pull request on GitHub against the `main` branch. A PR template will pre-fill — it includes a checklist covering the type of change you made. Use the appropriate issue template when opening issues:
+
+| Issue Type | Template |
+|---|---|
+| Bug Report | `.github/ISSUE_TEMPLATE/bug_report.yml` |
+| Feature Request | `.github/ISSUE_TEMPLATE/feature_request.yml` |
+| Documentation | `.github/ISSUE_TEMPLATE/documentation.yml` |
+
+PR template (`.github/pull_request_template.md`):
 
 ```
 ## Summary
 
-Brief description of what this PR does.
+Brief description of what this PR does and why.
 
-## Changes
+## Related Issue
 
-- List of specific changes made
+Closes #
 
-## Related issue
+## Type of Change
 
-Closes #<issue-number>
+- [ ] feat — New feature
+- [ ] fix — Bug fix
+- [ ] docs — Documentation
+...
 
 ## Checklist
 
+- [ ] Linter passes (`pnpm lint`)
 - [ ] Tests pass (`pnpm test -- --run`)
-- [ ] Build passes (`pnpm build`)
-- [ ] Lint passes (`pnpm lint`)
-- [ ] Commit messages follow Conventional Commits
+- [ ] PR title follows Conventional Commits
+...
 ```
 
 ---

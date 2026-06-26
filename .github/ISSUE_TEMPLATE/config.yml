@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/Fidelis900/Blue-Collar/discussions
+    about: Please ask questions and propose ideas in Discussions.
+  - name: Telegram Community
+    url: https://t.me/bluecollar
+    about: Join our Telegram for real-time community support.
