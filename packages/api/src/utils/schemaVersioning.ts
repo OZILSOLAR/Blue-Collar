@@ -145,7 +145,8 @@ function inferResourceType(path: string): string | null {
 }
 
 /**
- * Validate request payload compatibility with API version
+ * Validate request payload compatibility with API version.
+ * Returns 400 if the payload contains fields that are not valid for the given version.
  */
 export function validateRequestSchema(
   data: any,
@@ -170,6 +171,30 @@ export function validateRequestSchema(
   }
 
   return { valid: true }
+}
+
+/**
+ * Express middleware: validate request body against the per-version schema.
+ * Attach to routes that accept a request body (POST / PUT / PATCH).
+ *
+ * Usage:
+ *   router.post('/workers', perVersionSchemaValidation('worker'), createWorker)
+ */
+export function perVersionSchemaValidation(resourceType: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const version = req.apiVersion || 'v1'
+    const result = validateRequestSchema(req.body, version, resourceType)
+    if (!result.valid) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Request payload contains fields that are not supported in this API version.',
+        errors: result.errors,
+        version,
+        code: 400,
+      })
+    }
+    next()
+  }
 }
 
 /**
