@@ -54,6 +54,26 @@ services:
       retries: 3
       start_period: 40s
 
+  app:
+    build:
+      context: .
+      dockerfile: packages/app/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+        NEXT_PUBLIC_STELLAR_NETWORK: ${NEXT_PUBLIC_STELLAR_NETWORK:-TESTNET}
+        NEXT_PUBLIC_MARKET_CONTRACT_ID: ${NEXT_PUBLIC_MARKET_CONTRACT_ID:-}
+        NEXT_PUBLIC_REGISTRY_CONTRACT_ID: ${NEXT_PUBLIC_REGISTRY_CONTRACT_ID:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+
   adminer:
     image: adminer:latest
     restart: unless-stopped

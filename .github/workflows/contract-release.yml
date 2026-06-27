@@ -1,0 +1,78 @@
+name: Contract Release
+
+on:
+  push:
+    tags:
+      - "contracts/v*"
+
+defaults:
+  run:
+    working-directory: packages/contracts
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release-wasm:
+    name: Build & Release WASM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable with wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/contracts/target
+          key: ${{ runner.os }}-contracts-release-${{ hashFiles('packages/contracts/**/Cargo.toml', 'packages/contracts/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-contracts-release-
+
+      - name: Build optimised WASM
+        run: cargo build --release --target wasm32-unknown-unknown --workspace \
+          --exclude bluecollar-fuzz
+
+      - name: Install stellar-cli
+        run: cargo install --locked stellar-cli --version 21.4.0
+
+      - name: Compute Stellar install hashes
+        id: hashes
+        run: |
+          mkdir -p release-artifacts
+          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
+            name=$(basename "$wasm" .wasm)
+            cp "$wasm" "release-artifacts/${name}.wasm"
+            hash=$(stellar contract install \
+              --wasm "$wasm" \
+              --rpc-url https://soroban-testnet.stellar.org \
+              --network-passphrase "Test SDF Network ; September 2015" \
+              --source-account "${{ secrets.STELLAR_TESTNET_SECRET }}" 2>/dev/null || echo "offline-$(sha256sum "$wasm" | cut -d' ' -f1)")
+            echo "${name}: ${hash}" >> release-artifacts/WASM_HASHES.txt
+          done
+
+      - name: Generate SHA-256 checksum manifest
+        working-directory: packages/contracts/release-artifacts
+        run: sha256sum *.wasm > SHA256SUMS.txt
+
+      - name: Upload artifacts to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-wasm-${{ github.ref_name }}
+          path: packages/contracts/release-artifacts/
+          if-no-files-found: error
+
+      - name: Attach artifacts to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            packages/contracts/release-artifacts/*.wasm
+            packages/contracts/release-artifacts/SHA256SUMS.txt
+            packages/contracts/release-artifacts/WASM_HASHES.txt
