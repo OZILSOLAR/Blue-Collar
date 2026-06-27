@@ -28,6 +28,7 @@ import helpfulRoutes from './routes/helpful.js'
 import vitalsRoutes from './routes/vitals.js'
 import walletRoutes from './routes/wallet.js'
 import indexerRoutes from './routes/indexer.js'
+import escrowRoutes from './routes/escrow.js'
 import { auditMiddleware } from './middleware/audit.js'
 import { sanitize } from './middleware/sanitize.js'
 import { versionMiddleware, deprecationWarning, versionDeprecationMiddleware } from './middleware/version.js'
@@ -92,6 +93,7 @@ app.use('/api/reviews', helpfulRoutes)
 app.use('/api', vitalsRoutes)
 app.use('/api/wallet', walletRoutes)
 app.use('/api/events', indexerRoutes)
+app.use('/api/escrow', escrowRoutes)
 // ── Versioned routes (v1) ─────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/categories', categoryRoutes)
@@ -113,6 +115,7 @@ app.use('/api/v1/conversations', conversationRoutes)
 app.use('/api/v1/reviews', helpfulRoutes)
 app.use('/api/v1/wallet', walletRoutes)
 app.use('/api/v1/events', indexerRoutes)
+app.use('/api/v1/escrow', escrowRoutes)
 
 // ── Versioned routes (v2) ─────────────────────────────────────────────────────
 app.use('/api/v2/auth', authRoutes)
@@ -134,6 +137,7 @@ app.use('/api/v2/conversations', conversationRoutes)
 app.use('/api/v2/reviews', helpfulRoutes)
 app.use('/api/v2/wallet', walletRoutes)
 app.use('/api/v2/events', indexerRoutes)
+app.use('/api/v2/escrow', escrowRoutes)
 
 // ── Version endpoint ──────────────────────────────────────────────────────────
 app.get('/api/version', (_req, res) => {

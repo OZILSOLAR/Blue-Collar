@@ -536,6 +536,79 @@ model StellarAccount {
   @@index([userId])
 }
 
+// ─── Issue #771: Secure File Upload & Media Pipeline ─────────────────────────
+
+model MediaAsset {
+  id           String   @id @default(cuid())
+  originalName String
+  mimeType     String
+  size         Int
+  thumbKey     String
+  thumbUrl     String
+  mediumKey    String
+  mediumUrl    String
+  fullKey      String
+  fullUrl      String
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([uploadedById])
+}
+
+// ─── Issue #755: Escrow Orchestration ────────────────────────────────────────
+
+model EscrowRecord {
+  id            String        @id @default(cuid())
+  jobId         String?
+  payerId       String
+  payeeId       String
+  amountXlm     Float
+  status        EscrowStatus  @default(pending)
+  txId          String?       // Stellar transaction / contract reference
+  expiresAt     DateTime
+  releasedAt    DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  disputes      EscrowDispute[]
+
+  @@index([payerId])
+  @@index([payeeId])
+  @@index([status])
+}
+
+model EscrowDispute {
+  id          String              @id @default(cuid())
+  escrowId    String
+  escrow      EscrowRecord        @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  filedById   String
+  reason      String
+  evidence    String?
+  status      EscrowDisputeStatus @default(open)
+  resolution  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([escrowId])
+  @@index([status])
+}
+
+enum EscrowStatus {
+  pending
+  active
+  released
+  cancelled
+  disputed
+}
+
+enum EscrowDisputeStatus {
+  open
+  under_review
+  resolved
+  dismissed
+}
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
