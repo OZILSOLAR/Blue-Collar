@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import jwt from 'jsonwebtoken'
+import argon2 from 'argon2'
 import { z } from 'zod'
 import { db } from '../db.js'
 import { sendVerificationEmail } from '../mailer/index.js'
@@ -60,4 +61,58 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
   }
 
   return sanitizeUser(updated)
+}
+
+/** Change a user's password. Verifies the current password before updating. */
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (newPassword.length < 8) throw new AppError('Password must be at least 8 characters', 400)
+
+  const user = await db.user.findUnique({ where: { id: userId } })
+  if (!user || !user.password) throw new AppError('No password set on this account', 400)
+
+  const valid = await argon2.verify(user.password, currentPassword)
+  if (!valid) throw new AppError('Current password is incorrect', 400)
+
+  const hashed = await argon2.hash(newPassword)
+  await db.user.update({ where: { id: userId }, data: { password: hashed } })
+  logger.info('Password changed', { userId })
+}
+
+/** Permanently delete a user account. */
+export async function deleteAccount(userId: string): Promise<void> {
+  await db.user.delete({ where: { id: userId } })
+  logger.info('Account deleted', { userId })
+}
+
+export interface PushSubscriptionInput {
+  endpoint: string
+  keys: { auth: string; p256dh: string }
+}
+
+/** Register or update a web push subscription for a user. */
+export async function savePushSubscription(userId: string, input: PushSubscriptionInput) {
+  const { endpoint, keys } = input
+  return db.pushSubscription.upsert({
+    where: { userId_endpoint: { userId, endpoint } },
+    update: { auth: keys.auth, p256dh: keys.p256dh },
+    create: { userId, endpoint, auth: keys.auth, p256dh: keys.p256dh },
+  })
+}
+
+/** Remove a push subscription endpoint for a user. */
+export async function deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+  await db.pushSubscription.delete({ where: { userId_endpoint: { userId, endpoint } } })
+}
+
+/** Mark onboarding as completed for a user. */
+export async function completeOnboarding(userId: string) {
+  const user = await db.user.update({
+    where: { id: userId },
+    data: { onboardingCompleted: true },
+  })
+  return sanitizeUser(user)
 }

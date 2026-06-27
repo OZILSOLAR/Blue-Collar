@@ -1,5 +1,4 @@
 import type { Request, Response } from 'express'
-import argon2 from 'argon2'
 import { db } from '../db.js'
 import { sanitizeUser } from '../models/user.model.js'
 import * as userService from '../services/user.service.js'
@@ -52,7 +51,7 @@ export async function updateMe(req: Request, res: Response) {
     if (error?.statusCode) {
       return res.status(error.statusCode).json({ status: 'error', message: error.message, code: error.statusCode })
     }
-    console.error('[updateProfile] error:', error)
+    logger.error({ err: error }, '[updateMe] error')
     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ status: 'error', message: ErrorMessages.FAILED_UPDATE_PROFILE, code: HttpStatus.INTERNAL_SERVER_ERROR })
   }
 }
@@ -63,33 +62,19 @@ export async function changePassword(req: Request, res: Response) {
   const userId = req.user?.id
   if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ status: 'error', message: ErrorMessages.UNAUTHORIZED, code: HttpStatus.UNAUTHORIZED })
 
-  const { currentPassword, newPassword } = req.body as {
-    currentPassword?: string
-    newPassword?: string
-  }
+  const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string }
 
   if (!currentPassword || !newPassword) {
     return res.status(HttpStatus.BAD_REQUEST).json({ status: 'error', message: ErrorMessages.CURRENT_PASSWORD_REQUIRED, code: HttpStatus.BAD_REQUEST })
   }
-  if (newPassword.length < 8) {
-    return res.status(HttpStatus.BAD_REQUEST).json({ status: 'error', message: ErrorMessages.PASSWORD_TOO_SHORT, code: HttpStatus.BAD_REQUEST })
-  }
 
   try {
-    const user = await db.user.findUnique({ where: { id: userId } })
-    if (!user || !user.password) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ status: 'error', message: ErrorMessages.OAUTH_ACCOUNT_NO_PASSWORD, code: HttpStatus.BAD_REQUEST })
-    }
-
-    const valid = await argon2.verify(user.password, currentPassword)
-    if (!valid) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ status: 'error', message: ErrorMessages.CURRENT_PASSWORD_INCORRECT, code: HttpStatus.BAD_REQUEST })
-    }
-
-    const hashed = await argon2.hash(newPassword)
-    await db.user.update({ where: { id: userId }, data: { password: hashed } })
+    await userService.changePassword(userId, currentPassword, newPassword)
     return res.json({ status: 'success', message: 'Password updated', code: HttpStatus.OK })
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ status: 'error', message: error.message, code: error.statusCode })
+    }
     logger.error({ err: error }, '[changePassword] error')
     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ status: 'error', message: ErrorMessages.FAILED_CHANGE_PASSWORD, code: HttpStatus.INTERNAL_SERVER_ERROR })
   }
@@ -102,7 +87,7 @@ export async function deleteAccount(req: Request, res: Response) {
   if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ status: 'error', message: ErrorMessages.UNAUTHORIZED, code: HttpStatus.UNAUTHORIZED })
 
   try {
-    await db.user.delete({ where: { id: userId } })
+    await userService.deleteAccount(userId)
     return res.json({ status: 'success', message: 'Account deleted', code: HttpStatus.OK })
   } catch (error) {
     logger.error({ err: error }, '[deleteAccount] error')
@@ -122,12 +107,7 @@ export async function savePushSubscription(req: Request, res: Response) {
   }
 
   try {
-    const subscription = await db.pushSubscription.upsert({
-      where: { userId_endpoint: { userId, endpoint } },
-      update: { auth: keys.auth, p256dh: keys.p256dh },
-      create: { userId, endpoint, auth: keys.auth, p256dh: keys.p256dh },
-    })
-
+    const subscription = await userService.savePushSubscription(userId, { endpoint, keys })
     return res.json({ data: subscription, status: 'success', code: HttpStatus.CREATED })
   } catch (error) {
     logger.error({ err: error }, '[savePushSubscription] error')
@@ -145,10 +125,7 @@ export async function deletePushSubscription(req: Request, res: Response) {
   }
 
   try {
-    await db.pushSubscription.delete({
-      where: { userId_endpoint: { userId, endpoint } },
-    })
-
+    await userService.deletePushSubscription(userId, endpoint)
     return res.json({ status: 'success', message: 'Unsubscribed', code: HttpStatus.OK })
   } catch (error) {
     logger.error({ err: error }, '[deletePushSubscription] error')
@@ -156,18 +133,15 @@ export async function deletePushSubscription(req: Request, res: Response) {
   }
 }
 
-// ── Onboarding ────────────────────────────────────────────────────────────
+// ── Onboarding ────────────────────────────────────────────────────────────────
 
 export async function completeOnboarding(req: Request, res: Response) {
   const userId = req.user?.id
   if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ status: 'error', message: ErrorMessages.UNAUTHORIZED, code: HttpStatus.UNAUTHORIZED })
 
   try {
-    const user = await db.user.update({
-      where: { id: userId },
-      data: { onboardingCompleted: true },
-    })
-    return res.json({ data: sanitizeUser(user), status: 'success', message: 'Onboarding completed', code: HttpStatus.OK })
+    const user = await userService.completeOnboarding(userId)
+    return res.json({ data: user, status: 'success', message: 'Onboarding completed', code: HttpStatus.OK })
   } catch (error) {
     logger.error({ err: error }, '[completeOnboarding] error')
     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ status: 'error', message: ErrorMessages.FAILED_ONBOARDING, code: HttpStatus.INTERNAL_SERVER_ERROR })

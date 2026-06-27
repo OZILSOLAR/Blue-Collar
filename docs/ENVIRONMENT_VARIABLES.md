@@ -27,6 +27,7 @@
 | `VAPID_PUBLIC_KEY` | string | — | yes | Web Push VAPID public key |
 | `VAPID_PRIVATE_KEY` | string | — | yes | Web Push VAPID private key |
 | `HORIZON_URL` | string | `https://horizon-testnet.stellar.org` | yes | Stellar Horizon base URL |
+| `STELLAR_NETWORK` | string | `testnet` | no | `testnet` \| `mainnet` — controls SDK defaults |
 | `REGISTRY_CONTRACT_ID` | string | — | yes | Soroban Registry contract ID |
 | `MARKET_CONTRACT_ID` | string | — | yes | Soroban Market contract ID |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | string | — | no | OpenTelemetry collector endpoint |
@@ -52,4 +53,6 @@
 
 ## Startup Validation
 
-The API fails fast on startup if any required variable is missing. To add a variable to the required-check list, edit `packages/api/src/config.ts` (or the equivalent env-validation module).
+The API fails fast on startup if any required variable is missing. All environment access is centralised in `packages/api/src/config/config.ts` — no code outside that file reads `process.env` directly. The typed `config` object is re-exported from `packages/api/src/config/env.ts` for backwards compatibility.
+
+To add a new variable: add it to `config.ts` using `required()` or `optional()` helpers, then document it in this table. Startup will throw a descriptive error message if a required key is absent.
