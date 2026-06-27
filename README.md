@@ -46,6 +46,9 @@ Many skilled workers lack a platform to help them get noticed. Meanwhile, countl
 - [Contributing Guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Frontend Contributing Guide](packages/app/CONTRIBUTING.md)
+- [i18n & Translation Guide](docs/i18n-translations.md)
+- [Stellar Wallet Integration Guide](docs/stellar-wallet-integration.md)
+- [Mainnet Launch Checklist](docs/MAINNET_LAUNCH_CHECKLIST.md)
 
 ---
 
@@ -481,9 +484,18 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide, including commit me
 
 1. Check the open issues for something to work on
 2. Fork the repo and create a feature branch
-3. Make your changes and open a pull request
+3. Make your changes and open a pull request using the [PR template](.github/pull_request_template.md)
 
 All PRs require passing CI checks.
+
+### Contribution Areas
+
+| Area | Guide |
+|---|---|
+| Code (API, App, Contracts) | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| First contribution walkthrough | [docs/CONTRIBUTING_GUIDE.md](./docs/CONTRIBUTING_GUIDE.md) |
+| Translations & localization | [docs/i18n-translations.md](./docs/i18n-translations.md) |
+| Stellar wallet integration | [docs/stellar-wallet-integration.md](./docs/stellar-wallet-integration.md) |
 
 ---
 
