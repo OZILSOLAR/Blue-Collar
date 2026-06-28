@@ -26,9 +26,7 @@ import notificationRoutes from './routes/notifications.js'
 import conversationRoutes from './routes/conversations.js'
 import helpfulRoutes from './routes/helpful.js'
 import vitalsRoutes from './routes/vitals.js'
-import walletRoutes from './routes/wallet.js'
-import indexerRoutes from './routes/indexer.js'
-import escrowRoutes from './routes/escrow.js'
+import devicesRoutes from './routes/devices.js'
 import { auditMiddleware } from './middleware/audit.js'
 import { sanitize } from './middleware/sanitize.js'
 import { versionMiddleware, deprecationWarning, versionDeprecationMiddleware } from './middleware/version.js'
@@ -90,6 +88,7 @@ app.use('/api/jobs', jobRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/conversations', conversationRoutes)
 app.use('/api/reviews', helpfulRoutes)
+app.use('/api/auth', devicesRoutes)
 app.use('/api', vitalsRoutes)
 app.use('/api/wallet', walletRoutes)
 app.use('/api/events', indexerRoutes)
@@ -113,9 +112,7 @@ app.use('/api/v1/jobs', jobRoutes)
 app.use('/api/v1/notifications', notificationRoutes)
 app.use('/api/v1/conversations', conversationRoutes)
 app.use('/api/v1/reviews', helpfulRoutes)
-app.use('/api/v1/wallet', walletRoutes)
-app.use('/api/v1/events', indexerRoutes)
-app.use('/api/v1/escrow', escrowRoutes)
+app.use('/api/v1/auth', devicesRoutes)
 
 // ── Versioned routes (v2) ─────────────────────────────────────────────────────
 app.use('/api/v2/auth', authRoutes)
@@ -125,6 +122,7 @@ app.use('/api/v2/admin', adminRoutes)
 app.use('/api/v2/users', userRoutes)
 app.use('/api/v2/disputes', disputeRoutes)
 app.use('/api/v2/recommendations', recommendationRoutes)
+app.use('/api/v2/auth', devicesRoutes)
 app.use('/api/v2/webhooks', webhookRoutes)
 app.use('/api/v2/verifications', verificationRoutes)
 app.use('/api/v2/audit', auditRoutes)

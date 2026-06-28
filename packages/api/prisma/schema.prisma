@@ -67,6 +67,7 @@ model User {
   jobMessagesSent             JobMessage[]          @relation("JobMessagesSent")
   jobMessagesReceived         JobMessage[]          @relation("JobMessagesReceived")
   refreshTokens               RefreshToken[]
+  devices                     Device[]
   notificationPreferences     NotificationPreferences?
   notifications               Notification[]
   helpfulVotes                ReviewHelpful[]
@@ -187,6 +188,9 @@ model Review {
   status      ReviewStatus  @default(pending)
   flagged     Boolean       @default(false)
   flagReason  String?
+  // Issue #750: Verified transactions
+  transactionHash String?   // On-chain transaction hash (tip/escrow)
+  isVerified  Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -809,4 +813,19 @@ enum BookingStatus {
   confirmed
   cancelled
   completed
+// ─── Issue #749: Device & Session Management ─────────────────────────────────
+
+model Device {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName    String    // e.g., "Chrome on MacOS", "Firefox on Windows"
+  userAgent     String?
+  ipAddress     String
+  lastUsedAt    DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
+  revokedAt     DateTime?
+
+  @@index([userId])
+  @@index([userId, revokedAt])
 }

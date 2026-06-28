@@ -7,6 +7,7 @@ import { AppError } from './AppError.js'
 import { sanitizeUser } from '../models/user.model.js'
 import { createServiceLogger } from '../utils/logger.js'
 import type { LoginBody, RegisterBody } from '../interfaces/index.js'
+import * as OTPAuth from 'otpauth'
 
 const logger = createServiceLogger('AuthService')
 const ACCESS_TOKEN_TTL = '15m'
@@ -37,8 +38,14 @@ function generateRefreshToken() {
 /**
  * Authenticate a user with email and password.
  * Issues a short-lived access token (15 min) and a long-lived refresh token (7 days).
+ * Optionally registers a device for the session.
  */
-export async function loginUser({ email, password }: LoginBody) {
+export async function loginUser(
+  { email, password }: LoginBody,
+  deviceName?: string,
+  userAgent?: string,
+  ipAddress?: string,
+) {
   logger.debug('Login attempt', { email })
   const user = await db.user.findUnique({ where: { email } })
   if (!user || !user.password || !(await argon2.verify(user.password, password))) {
@@ -60,8 +67,17 @@ export async function loginUser({ email, password }: LoginBody) {
   const { raw: refreshTokenRaw, hash: refreshTokenHash, expiresAt } = generateRefreshToken()
   await db.refreshToken.create({ data: { userId: user.id, tokenHash: refreshTokenHash, expiresAt } })
 
+  // Register device if provided
+  let deviceId: string | undefined
+  if (deviceName && ipAddress) {
+    const device = await db.device.create({
+      data: { userId: user.id, deviceName, userAgent, ipAddress },
+    })
+    deviceId = device.id
+  }
+
   logger.info('User logged in successfully', { userId: user.id, email })
-  return { data: sanitizeUser(user), token: accessToken, refreshToken: refreshTokenRaw }
+  return { data: sanitizeUser(user), token: accessToken, refreshToken: refreshTokenRaw, deviceId }
 }
 
 /**
@@ -238,6 +254,7 @@ export async function requestPasswordReset(email: string) {
  *
  * Hashes the provided token, looks up the matching user, and updates the password.
  * Clears the reset token fields on success.
+ * Invalidates all refresh tokens on password reset for security.
  *
  * @param token - The raw reset token from the email link.
  * @param password - The new plaintext password (will be hashed with Argon2).
@@ -251,8 +268,130 @@ export async function resetPassword(token: string, password: string) {
   if (!user) throw new AppError('Token is invalid or has expired', 400)
 
   const hashedPassword = await argon2.hash(password)
+  
+  // Invalidate all active sessions for security
+  await db.refreshToken.updateMany({
+    where: { userId: user.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  })
+
+  // Revoke all devices
+  await db.device.updateMany({
+    where: { userId: user.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  })
+
   await db.user.update({
     where: { id: user.id },
     data: { password: hashedPassword, resetToken: null, resetTokenExpiry: null },
+  })
+
+  logger.info('Password reset successfully - all sessions revoked', { userId: user.id })
+}
+
+/**
+ * Generate a TOTP secret for 2FA enrollment.
+ * Returns the secret and QR code data URL for display on the frontend.
+ */
+export async function generateTOTPSecret(userId: string) {
+  const user = await db.user.findUnique({ where: { id: userId } })
+  if (!user) throw new AppError('User not found', 404)
+  if (user.twoFactorEnabled) throw new AppError('2FA is already enabled', 409)
+
+  const secret = new OTPAuth.Secret({ size: 32 })
+  const totp = new OTPAuth.TOTP({
+    issuer: 'BlueCollar',
+    label: `BlueCollar (${user.email})`,
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+    secret,
+  })
+
+  return {
+    secret: secret.base32,
+    qrCode: totp.toString(),
+  }
+}
+
+/**
+ * Verify a TOTP code and enable 2FA for the user.
+ * Generates backup codes and stores them.
+ */
+export async function enableTwoFactorAuth(userId: string, totpCode: string, secret: string) {
+  const user = await db.user.findUnique({ where: { id: userId } })
+  if (!user) throw new AppError('User not found', 404)
+
+  const totp = new OTPAuth.TOTP({
+    issuer: 'BlueCollar',
+    label: `BlueCollar (${user.email})`,
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secret),
+  })
+
+  // Verify the code (allow ±1 time window for clock skew)
+  const isValid = totp.validate({ code: totpCode, window: 1 })
+  if (!isValid) throw new AppError('Invalid TOTP code', 400)
+
+  // Generate 10 backup codes
+  const backupCodes = Array.from({ length: 10 }, () =>
+    crypto.randomBytes(4).toString('hex').toUpperCase(),
+  )
+
+  await db.user.update({
+    where: { id: userId },
+    data: {
+      twoFactorSecret: secret,
+      twoFactorEnabled: true,
+      twoFactorBackupCodes: backupCodes,
+    },
+  })
+
+  return { backupCodes }
+}
+
+/**
+ * Verify a TOTP code during login or sensitive operations.
+ * Accepts both regular TOTP codes and backup codes.
+ */
+export async function verifyTOTPCode(userId: string, code: string) {
+  const user = await db.user.findUnique({ where: { id: userId } })
+  if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+    throw new AppError('2FA not enabled for this user', 400)
+  }
+
+  // Check backup codes first (and remove if used)
+  if (user.twoFactorBackupCodes && user.twoFactorBackupCodes.includes(code)) {
+    const updated = user.twoFactorBackupCodes.filter((c) => c !== code)
+    await db.user.update({ where: { id: userId }, data: { twoFactorBackupCodes: updated } })
+    return true
+  }
+
+  // Verify TOTP code
+  const totp = new OTPAuth.TOTP({
+    issuer: 'BlueCollar',
+    label: `BlueCollar (${user.email})`,
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(user.twoFactorSecret),
+  })
+
+  return !!totp.validate({ code, window: 1 })
+}
+
+/**
+ * Disable 2FA for a user.
+ */
+export async function disableTwoFactorAuth(userId: string) {
+  await db.user.update({
+    where: { id: userId },
+    data: {
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+      twoFactorBackupCodes: [],
+    },
   })
 }
