@@ -215,7 +215,7 @@ pub struct Badge {
 
 /// Verification level for a worker (#778).
 #[contracttype]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VerificationLevel {
     /// No verification — default state.
     None = 0,
