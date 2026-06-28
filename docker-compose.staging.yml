@@ -52,20 +52,22 @@ services:
       - staging
 
   app:
-    image: node:20-alpine
-    working_dir: /workspace/packages/app
+    build:
+      context: .
+      dockerfile: packages/app/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3000/api}
+        NEXT_PUBLIC_STELLAR_NETWORK: ${NEXT_PUBLIC_STELLAR_NETWORK:-TESTNET}
+        NEXT_PUBLIC_MARKET_CONTRACT_ID: ${NEXT_PUBLIC_MARKET_CONTRACT_ID:-}
+        NEXT_PUBLIC_REGISTRY_CONTRACT_ID: ${NEXT_PUBLIC_REGISTRY_CONTRACT_ID:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     restart: unless-stopped
     depends_on:
-      - api
-    env_file:
-      - packages/app/.env.staging
+      api:
+        condition: service_healthy
     environment:
       NODE_ENV: staging
       PORT: 3001
-    volumes:
-      - ./:/workspace
-    command:
-      ['sh', '-c', 'corepack enable && pnpm install --frozen-lockfile && pnpm build && pnpm start -p 3001']
     expose:
       - '3001'
     ports:

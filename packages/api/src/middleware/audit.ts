@@ -12,6 +12,8 @@ const ACTION_MAP: Array<{ method: string; pattern: RegExp; action: string; resou
   { method: 'DELETE', pattern: /^\/api\/workers\/[^/]+$/,        action: 'worker.delete',         resource: 'Worker' },
   { method: 'PATCH',  pattern: /^\/api\/workers\/[^/]+\/toggle$/, action: 'worker.toggle',        resource: 'Worker' },
   { method: 'PATCH',  pattern: /^\/api\/verifications\/[^/]+\/review$/, action: 'admin.verification_review', resource: 'VerificationRequest' },
+  { method: 'PATCH',  pattern: /^\/api\/admin\/users\/[^/]+\/role$/, action: 'user.change_role',  resource: 'user' },
+  { method: 'PATCH',  pattern: /^\/api\/admin\/workers\/[^/]+\/moderate$/, action: 'worker.moderate', resource: 'worker' },
   { method: 'DELETE', pattern: /^\/api\/admin\//,                action: 'admin.action',          resource: 'Admin' },
   { method: 'PATCH',  pattern: /^\/api\/admin\//,                action: 'admin.action',          resource: 'Admin' },
 ]

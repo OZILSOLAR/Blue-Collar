@@ -1,14 +1,15 @@
 # BlueCollar API — Quick Start Guide
 
-Get the API running locally in under 5 minutes.
+Get the API running locally in under 5 minutes (assuming prerequisites are installed).
 
 ---
 
 ## Prerequisites
 
 - **Node.js** >= 20
-- **pnpm** >= 9 (`npm i -g pnpm`)
+- **pnpm** >= 9 (`npm i -g pnpm@9`)
 - **PostgreSQL** running locally (or a connection string to a remote instance)
+- **Redis** running locally (API degrades gracefully if absent)
 
 ---
 
@@ -30,24 +31,41 @@ cp packages/api/.env.example packages/api/.env
 
 Open `packages/api/.env` and fill in the required values:
 
-| Variable | Example |
-|---|---|
-| `DATABASE_URL` | `postgresql://user:pass@localhost:5432/bluecollar` |
-| `JWT_SECRET` | any long random string |
-| `PORT` | `3000` |
+| Variable | Example | Required? |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://user:pass@localhost:5432/bluecollar` | Yes |
+| `TEST_DATABASE_URL` | `postgresql://user:pass@localhost:5432/bluecollar_test` | For tests |
+| `JWT_SECRET` | `openssl rand -hex 32` output | Yes |
+| `APP_URL` | `http://localhost:3001` | Yes |
+| `ALLOWED_ORIGINS` | `http://localhost:3001` | Yes |
+| `GOOGLE_CLIENT_ID` | `placeholder` | Yes (must be non-empty) |
+| `GOOGLE_CLIENT_SECRET` | `placeholder` | Yes (must be non-empty) |
+| `MAIL_HOST` | `localhost` | Yes (must be non-empty) |
+| `MAIL_USER` | `dev@localhost` | Yes (must be non-empty) |
+| `MAIL_PASS` | `dev` | Yes (must be non-empty) |
 
-All other variables (Google OAuth, SMTP) are optional for local development.
+The config module validates these at startup. Set Google OAuth and SMTP vars to placeholder values for local development — features that depend on real credentials will gracefully no-op.
+
+All other variables (`REDIS_URL`, `PORT`, Stellar contract IDs, VAPID keys) are optional and fall back to sensible defaults.
+
+Create the databases (if they don't exist yet):
+
+```bash
+createdb bluecollar
+createdb bluecollar_test
+```
 
 ---
 
-## 3. Run Migrations
+## 3. Generate Prisma Client & Run Migrations
 
 ```bash
 cd packages/api
+pnpm prisma:generate
 pnpm migrate
 ```
 
-This runs `prisma migrate dev` and applies all schema migrations to your database.
+This generates the Prisma client from the schema and applies all pending migrations.
 
 ---
 
@@ -67,7 +85,22 @@ Populates the database with default categories.
 pnpm dev
 ```
 
-The API will be available at `http://localhost:3000/api`.
+The API will be available at `http://localhost:3000`.
+
+---
+
+## 6. Verify It Works
+
+```bash
+# Health check
+curl http://localhost:3000/health
+
+# Readiness check (DB + Redis)
+curl http://localhost:3000/ready
+
+# List categories
+curl http://localhost:3000/api/categories
+```
 
 ---
 
@@ -87,18 +120,20 @@ pnpm admin:create --email admin@example.com --password secret123 --firstName Jan
 - Make sure the database exists: `createdb bluecollar`
 
 **`prisma migrate dev` fails with "database does not exist"**
-- Create the database first: `createdb bluecollar` (or the name in your `DATABASE_URL`)
+- Create the database first: `createdb bluecollar`
 
-**Missing environment variable errors on startup**
-- Confirm `packages/api/.env` exists and is not empty
-- Ensure you copied from `.env.example`: `cp .env.example .env`
+**Config validation errors on startup**
+- Ensure **all** required vars in the table above are set — the config module will crash on missing `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MAIL_HOST`, `MAIL_USER`, `MAIL_PASS`, `APP_URL`, `DATABASE_URL`, or `JWT_SECRET`
 
 **`pnpm: command not found`**
-- Install pnpm globally: `npm i -g pnpm`
+- Install pnpm globally: `npm i -g pnpm@9`
 
 **Port 3000 already in use**
 - Set a different port in `.env`: `PORT=3001`
 - Or kill the process using the port: `lsof -ti:3000 | xargs kill`
+
+**Redis not available (non-fatal)**
+- The API logs a warning and disables caching / per-user rate limiting. Everything else works.
 
 ---
 

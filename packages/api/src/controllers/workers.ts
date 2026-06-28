@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import * as workerService from '../services/worker.service.js'
+import { searchWorkers } from '../services/search.service.js'
 import { handleError } from '../utils/handleError.js'
 import { db } from '../db.js'
 import { WorkerResource, WorkerCollection } from '../resources/index.js'
@@ -306,6 +307,42 @@ export async function listMyWorkers(req: Request, res: Response) {
     status: 'success',
     code: 200,
   })
+}
+
+/**
+ * GET /api/workers/search
+ * Full-text worker search with ranked results, geo radius, rating, and availability filters.
+ * Issue #747
+ */
+export async function searchWorkersHandler(req: Request, res: Response) {
+  try {
+    const {
+      q, query, lang, lat, lng, radius,
+      categories, minRating, maxRating,
+      dayOfWeek, isVerified, sortBy,
+      page = '1', limit = '20',
+    } = req.query
+
+    const result = await searchWorkers({
+      query: (q || query) ? String(q ?? query) : undefined,
+      lang: lang ? String(lang) : undefined,
+      lat: lat ? Number(lat) : undefined,
+      lng: lng ? Number(lng) : undefined,
+      radius: radius ? Number(radius) : undefined,
+      categories: categories ? String(categories).split(',').map(c => c.trim()).filter(Boolean) : undefined,
+      minRating: minRating ? Number(minRating) : undefined,
+      maxRating: maxRating ? Number(maxRating) : undefined,
+      dayOfWeek: dayOfWeek !== undefined ? Number(dayOfWeek) : undefined,
+      isVerified: isVerified !== undefined ? isVerified === 'true' : undefined,
+      sortBy: sortBy as any,
+      page: Number(page),
+      limit: Math.min(Math.max(Number(limit) || 20, 1), 100),
+    }, req.ip)
+
+    return res.json({ ...result, status: 'success', code: 200 })
+  } catch (error) {
+    return handleError(res, error)
+  }
 }
 
 /**

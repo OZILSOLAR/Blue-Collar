@@ -537,3 +537,160 @@ mod security_regression {
         f.client().propose_upgrade(&f.admin, &hash);
     }
 }
+
+// ===========================================================================
+// 6. Verification levels & certified skills (#778)
+// ===========================================================================
+
+mod verification_levels {
+    use super::*;
+
+    fn setup() -> UpgradeFixture {
+        let f = UpgradeFixture::new();
+        f.client().add_curator(&f.admin, &f.curator);
+        f
+    }
+
+    #[test]
+    fn set_and_get_verification_level() {
+        let f = setup();
+        let id = f.register("worker1");
+
+        assert_eq!(
+            f.client().get_verification_level(&id),
+            VerificationLevel::None
+        );
+
+        f.client()
+            .set_verification_level(&f.admin, &id, &VerificationLevel::Verified);
+
+        assert_eq!(
+            f.client().get_verification_level(&id),
+            VerificationLevel::Verified
+        );
+    }
+
+    #[test]
+    fn set_verification_level_can_upgrade_and_downgrade() {
+        let f = setup();
+        let id = f.register("w1");
+
+        f.client()
+            .set_verification_level(&f.admin, &id, &VerificationLevel::Expert);
+        assert_eq!(
+            f.client().get_verification_level(&id),
+            VerificationLevel::Expert
+        );
+
+        f.client()
+            .set_verification_level(&f.admin, &id, &VerificationLevel::Basic);
+        assert_eq!(
+            f.client().get_verification_level(&id),
+            VerificationLevel::Basic
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn set_verification_level_requires_curator_mgr() {
+        let f = setup();
+        let id = f.register("w1");
+        let stranger = Address::generate(&f.env);
+        f.client()
+            .set_verification_level(&stranger, &id, &VerificationLevel::Basic);
+    }
+
+    #[test]
+    #[should_panic(expected = "Worker not found")]
+    fn set_verification_level_unknown_worker_panics() {
+        let f = setup();
+        let bad_id = Symbol::new(&f.env, "nobody");
+        f.client()
+            .set_verification_level(&f.admin, &bad_id, &VerificationLevel::Basic);
+    }
+
+    #[test]
+    fn add_certified_skill_stores_and_queryable() {
+        let f = setup();
+        let id = f.register("w1");
+        let skill = Symbol::new(&f.env, "arc_welding");
+
+        f.client().add_certified_skill(&f.admin, &id, &skill, &0);
+
+        let skills = f.client().get_certified_skills(&id);
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills.get(0).unwrap().skill, skill);
+    }
+
+    #[test]
+    fn add_certified_skill_replaces_existing() {
+        let f = setup();
+        let id = f.register("w1");
+        let skill = Symbol::new(&f.env, "pipe_fitting");
+
+        f.client().add_certified_skill(&f.admin, &id, &skill, &0);
+        f.client().add_certified_skill(&f.admin, &id, &skill, &9999);
+
+        let skills = f.client().get_certified_skills(&id);
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills.get(0).unwrap().expires_at, 9999);
+    }
+
+    #[test]
+    fn add_multiple_distinct_skills() {
+        let f = setup();
+        let id = f.register("w1");
+
+        f.client()
+            .add_certified_skill(&f.admin, &id, &Symbol::new(&f.env, "skill_a"), &0);
+        f.client()
+            .add_certified_skill(&f.admin, &id, &Symbol::new(&f.env, "skill_b"), &0);
+
+        assert_eq!(f.client().get_certified_skills(&id).len(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn add_certified_skill_requires_curator_mgr() {
+        let f = setup();
+        let id = f.register("w1");
+        let stranger = Address::generate(&f.env);
+        f.client().add_certified_skill(
+            &stranger,
+            &id,
+            &Symbol::new(&f.env, "skill_a"),
+            &0,
+        );
+    }
+
+    #[test]
+    fn revoke_certified_skill_removes_entry() {
+        let f = setup();
+        let id = f.register("w1");
+        let skill = Symbol::new(&f.env, "arc_welding");
+
+        f.client().add_certified_skill(&f.admin, &id, &skill, &0);
+        f.client().revoke_certified_skill(&f.admin, &id, &skill);
+
+        assert_eq!(f.client().get_certified_skills(&id).len(), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Skill not found")]
+    fn revoke_nonexistent_skill_panics() {
+        let f = setup();
+        let id = f.register("w1");
+        f.client().revoke_certified_skill(
+            &f.admin,
+            &id,
+            &Symbol::new(&f.env, "nonexistent"),
+        );
+    }
+
+    #[test]
+    fn get_certified_skills_empty_for_new_worker() {
+        let f = setup();
+        let id = f.register("w1");
+        assert_eq!(f.client().get_certified_skills(&id).len(), 0);
+    }
+}

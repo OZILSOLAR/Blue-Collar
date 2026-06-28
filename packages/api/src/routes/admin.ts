@@ -1,5 +1,8 @@
 import { Router } from 'express'
-import { listWorkers, listUsers, getStats, bulkToggleWorkers, bulkDeleteWorkers, suspendUser, unsuspendUser, banUser } from '../controllers/admin.js'
+import {
+  listWorkers, listUsers, getStats, bulkToggleWorkers, bulkDeleteWorkers,
+  suspendUser, unsuspendUser, banUser, changeRole, moderateWorker, listAuditLogs,
+} from '../controllers/admin.js'
 import { importWorkersFromCsvController } from '../controllers/csv-import.js'
 import { exportWorkers, exportUsers } from '../controllers/export.js'
 import { authenticate, authorize } from '../middleware/auth.js'
@@ -34,5 +37,8 @@ router.delete('/workers/bulk-delete', bulkDeleteWorkers)
 router.patch('/users/:id/suspend', suspendUser)
 router.patch('/users/:id/unsuspend', unsuspendUser)
 router.patch('/users/:id/ban', banUser)
+router.patch('/users/:id/role', changeRole)
+router.patch('/workers/:id/moderate', moderateWorker)
+router.get('/audit', listAuditLogs)
 
 export default router

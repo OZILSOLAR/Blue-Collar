@@ -21,8 +21,14 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol, Vec};
 
+mod fees;
+use fees::split_fee;
+
 /// Maximum allowed protocol fee: 500 bps = 5%.
 pub const MAX_FEE_BPS: u32 = 500;
+
+/// Event schema version — bump when adding/removing/renaming events.
+pub const VERSION: u32 = 1;
 
 // =============================================================================
 // Roles
@@ -246,7 +252,6 @@ impl MarketContract {
         config.fee_bps = new_fee_bps;
         env.storage().instance().set(&DataKey::Config, &config);
     }
-
     /// Update the treasury (fee recipient) address. Caller must hold [`ROLE_ADMIN`].
     ///
     /// # Parameters
@@ -508,12 +513,7 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
 
         let client = token::Client::new(&env, &token_addr);
 
-        let fee: i128 = amount
-            .checked_mul(config.fee_bps as i128)
-            .and_then(|v| v.checked_div(10_000))
-            .expect("Fee overflow");
-        let worker_amount = amount.checked_sub(fee).expect("Fee underflow");
-
+        let (fee, worker_amount) = split_fee(amount, config.fee_bps);
         client.transfer(&from, &to, &worker_amount);
         if fee > 0 {
             client.transfer(&from, &config.fee_recipient, &fee);
@@ -526,8 +526,7 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
         env.events().publish(
             (symbol_short!("TipSent"), from, to),
             (token_addr, amount),
-        );
-    }
+        );    }
 
     // -------------------------------------------------------------------------
     // Escrow
@@ -624,7 +623,20 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
 
         let contract_addr = env.current_contract_address();
         let client = token::Client::new(&env, &escrow.token);
-        client.transfer(&contract_addr, &escrow.to, &escrow.amount);
+        let config: Config = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
+            .expect("Not initialized");
+        let (fee, net) = split_fee(escrow.amount, config.fee_bps);
+        client.transfer(&contract_addr, &escrow.to, &net);
+        if fee > 0 {
+            client.transfer(&contract_addr, &config.fee_recipient, &fee);
+            env.events().publish(
+                (symbol_short!("FeeTaken"),),
+                (fee, config.fee_recipient.clone()),
+            );
+        }
 
         escrow.released = true;
         env.storage().persistent().set(&DataKey::Escrow(id.clone()), &escrow);
@@ -692,12 +704,65 @@ fn get_role_members(env: &Env, role: &Symbol) -> Vec<Address> {
         env.storage().persistent().get(&DataKey::Escrow(id))
     }
 
+    /// Release multiple escrows in one transaction. Callable by payer or worker.
+    ///
+    /// Skips escrows that are already released, cancelled, or where `caller` is
+    /// not authorised — returns successfully released ids only.
+    ///
+    /// # Parameters
+    /// - `caller`: Must be `from` or `to` on each escrow; `require_auth()` enforced once.
+    /// - `ids`: Escrow identifiers to release (max 20).
+    ///
+    /// # Returns
+    /// A `Vec<Symbol>` of ids that were successfully released.
+    ///
+    /// # Panics
+    /// - `"Batch too large"` if `ids.len() > 20`.
+    ///
+    /// # Events
+    /// Emits `("EscRel", id, to)` with data `amount` for each released escrow.
+    pub fn batch_release_escrow(env: Env, caller: Address, ids: Vec<Symbol>) -> Vec<Symbol> {
+        caller.require_auth();
+        Self::require_not_paused(&env);
+        assert!(ids.len() <= 20, "Batch too large");
+
+        let contract_addr = env.current_contract_address();
+        let mut released: Vec<Symbol> = Vec::new(&env);
+
+        for id in ids.iter() {
+            let key = DataKey::Escrow(id.clone());
+            if let Some(mut escrow) = env.storage().persistent().get::<DataKey, Escrow>(&key) {
+                if escrow.released || escrow.cancelled {
+                    continue;
+                }
+                if escrow.from != caller && escrow.to != caller {
+                    continue;
+                }
+                let client = token::Client::new(&env, &escrow.token);
+                client.transfer(&contract_addr, &escrow.to, &escrow.amount);
+                escrow.released = true;
+                env.storage().persistent().set(&key, &escrow);
+                env.events().publish(
+                    (symbol_short!("EscRel"), id.clone(), escrow.to),
+                    escrow.amount,
+                );
+                released.push_back(id);
+            }
+        }
+        released
+    }
+
     /// Return the current contract configuration.
     pub fn get_config(env: Env) -> Config {
         env.storage()
             .instance()
             .get(&DataKey::Config)
             .expect("Not initialized")
+    }
+
+    /// Return the event schema version.
+    pub fn version(_env: Env) -> u32 {
+        VERSION
     }
 
     /// Cancel an escrow that has passed its expiry. Callable by anyone.

@@ -6,25 +6,20 @@ import type { Request, Response, NextFunction } from 'express'
 import { isApiKeyAllowedForVersion, isJwtRequiredForVersion } from '../utils/versioning.js'
 
 /**
- * Authenticate based on version-specific policies
+ * Authenticate based on version-specific policies.
+ *
+ * This middleware does NOT enforce authentication on public routes — it only
+ * validates the *method* of authentication when credentials are present.
+ * The actual per-route auth guard is handled by `authenticate` in auth.ts.
  */
 export function versionAwareAuth(req: Request, res: Response, next: NextFunction) {
   const version = req.apiVersion || 'v1'
   const authHeader = req.get('Authorization') || ''
 
-  // Check if JWT is required for this version
-  if (isJwtRequiredForVersion(version)) {
-    if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        status: 'error',
-        message: `API version ${version} requires JWT Bearer token authentication`,
-        code: 401,
-        supportedAuth: ['Bearer JWT'],
-      })
-    }
-  }
+  // Only enforce auth method rules when credentials are actually provided
+  if (!authHeader) return next()
 
-  // Check if API key auth is used but not allowed
+  // API key auth is not allowed in v2+ — reject if provided
   if (authHeader.startsWith('ApiKey ') && !isApiKeyAllowedForVersion(version)) {
     return res.status(401).json({
       status: 'error',

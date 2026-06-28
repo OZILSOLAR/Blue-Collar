@@ -427,3 +427,118 @@ VAULT_SECRET_ID=secret_id
 - Monitor Vault for unauthorized access
 - Use separate policies for different services
 - Document secret management procedures
+
+---
+
+## 12. Rotation Procedures (Operationalised) — #798
+
+All secrets must be rotated on a schedule. The table below documents the
+canonical rotation procedure for each secret class.
+
+### 12.1 Rotation Schedule
+
+| Secret | Rotation Frequency | Procedure |
+|--------|--------------------|-----------|
+| `JWT_SECRET` | 90 days (or immediately on suspected leak) | See §12.2 |
+| `DATABASE_URL` / DB password | 90 days | See §12.3 |
+| `MAIL_PASS` (SMTP) | 180 days | See §12.4 |
+| `GOOGLE_CLIENT_SECRET` | Per Google policy / on suspected leak | See §12.5 |
+| `BACKUP_GPG_PASSPHRASE` | 180 days | See §12.6 |
+| Vault root token | Never stored; unseal keys in hardware vault | N/A |
+
+### 12.2 JWT Secret Rotation
+
+```bash
+# 1. Generate new secret
+NEW_JWT=$(openssl rand -base64 48)
+
+# 2. Push to Vault
+vault kv patch kv/bluecollar/api jwt_secret="$NEW_JWT"
+
+# 3. Rolling restart (no downtime — old tokens expire naturally within TTL)
+kubectl rollout restart deployment/bluecollar-api
+```
+
+Active JWTs remain valid until their expiry (`exp` claim). After a full TTL
+cycle (default 24 h) all tokens signed with the old secret are expired.
+
+### 12.3 Database Password Rotation
+
+```bash
+# 1. Generate new password
+NEW_PASS=$(openssl rand -base64 32)
+
+# 2. Update Postgres (zero-downtime: dual-write window)
+psql "$OLD_DATABASE_URL" -c "ALTER USER bluecollar PASSWORD '$NEW_PASS';"
+
+# 3. Update Vault
+vault kv patch kv/bluecollar/database password="$NEW_PASS"
+
+# 4. Rolling restart to pick up new DATABASE_URL
+kubectl rollout restart deployment/bluecollar-api
+```
+
+### 12.4 SMTP Password Rotation
+
+```bash
+# 1. Update password in your SMTP provider dashboard
+# 2. Update in Vault
+vault kv patch kv/bluecollar/api mail_pass="<new-password>"
+# 3. Restart API to reload env
+kubectl rollout restart deployment/bluecollar-api
+```
+
+### 12.5 Google OAuth Secret Rotation
+
+1. Generate a new secret in [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Update Vault: `vault kv patch kv/bluecollar/api google_client_secret="<new>"`
+3. Restart the API: `kubectl rollout restart deployment/bluecollar-api`
+4. Revoke the old secret in Google Cloud Console.
+
+### 12.6 Backup GPG Passphrase Rotation
+
+```bash
+NEW_GPG=$(openssl rand -base64 32)
+# Update in GitHub Actions secrets: Settings → Secrets → BACKUP_GPG_PASSPHRASE
+# Re-encrypt latest backup with new passphrase:
+gpg --batch --passphrase "$OLD_GPG" --decrypt latest.sql.gz.gpg \
+  | gpg --batch --passphrase "$NEW_GPG" --symmetric --cipher-algo AES256 \
+        --output latest.sql.gz.gpg.new -
+mv latest.sql.gz.gpg.new latest.sql.gz.gpg
+```
+
+---
+
+## 13. CI Secret Scanning — #798
+
+A blocking CI workflow (`.github/workflows/secret-scan.yml`) runs on every
+push and pull request to prevent secrets from entering the repository.
+
+### Tools
+
+| Tool | Mode | Action on detection |
+|------|------|---------------------|
+| **Gitleaks** | Full history diff on push; PR delta on PRs | Hard CI failure |
+| **TruffleHog** | Verified secrets only | Hard CI failure |
+
+### What is scanned
+
+- All files tracked by Git (source, configs, docs)
+- Full commit history on push; delta on PRs
+
+### False-positive suppression
+
+Add a `.gitleaks.toml` at repo root to allowlist known false positives:
+
+```toml
+[[allowlist.regexes]]
+description = "Example key in docs"
+regex = "EXAMPLE_KEY_[A-Z0-9]+"
+```
+
+### Responding to a detected secret
+
+1. **Immediately rotate** the exposed secret (see §12 above).
+2. Run `git filter-repo` (or BFG) to purge it from history.
+3. Force-push the cleaned history and invalidate all cached clones.
+4. File a post-mortem issue referencing this runbook.

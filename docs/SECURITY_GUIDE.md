@@ -227,4 +227,20 @@ await db.$queryRaw(`SELECT * FROM users WHERE email = '${email}'`)
 
 ### 10. Admin key compromise (Stellar contracts)
 
-The Stellar contract admin key controls upgrades and curator management. Compromise of this key is the primary risk for the on-chain components. Protect it with a hardware wallet or multisig setup, and never store it in environment variables on a shared server.
+The Stellar contract admin key controls upgrades, role management, curator management, fee configuration, and contract migration. Compromise of this key is the primary risk for the on-chain components. Protect it with a hardware wallet or multisig setup, and never store it in environment variables on a shared server.
+
+See the [Threat Model](./THREAT_MODEL.md#key-custody--admin-powers) for a full breakdown of admin powers, key custody recommendations, and rotation cadences.
+
+---
+
+## Cross-References
+
+| Document | Content |
+|---|---|
+| [THREAT_MODEL.md](./THREAT_MODEL.md) | Full STRIDE threat model covering all trust boundaries (API, DB, contracts, wallet) |
+| [SECURITY_AUDIT_REPORT.md](./SECURITY_AUDIT_REPORT.md) | Internal smart contract audit findings |
+| [SECURITY_TESTING.md](./SECURITY_TESTING.md) | Security test strategy (unit, DAST, dependency scan, secret scan) |
+| [INCIDENT_RUNBOOK.md](./INCIDENT_RUNBOOK.md) | Production incident response procedures |
+| [packages/api/SECURITY.md](../packages/api/SECURITY.md) | Responsible disclosure policy (`security@bluecollar.dev`) |
+| [packages/contracts/SECURITY.md](../packages/contracts/SECURITY.md) | Contract-specific threat model & access control matrix |
+| [SECRETS_MANAGEMENT.md](./SECRETS_MANAGEMENT.md) | Vault-based secrets lifecycle

@@ -1,5 +1,6 @@
 import { db } from '../db.js'
 import { AppError } from '../services/AppError.js'
+import { dispatchNotification } from '../services/notification.service.js'
 
 const jobInclude = {
   category: true,
@@ -13,12 +14,30 @@ const applicationInclude = {
   worker: { select: { id: true, name: true, avatar: true, email: true, category: true } },
 } as const
 
-/** Auto-expire jobs whose expiresAt has passed */
+/** Auto-expire jobs whose expiresAt has passed, and notify the poster. */
 async function expireJobs() {
-  await db.job.updateMany({
+  const expired = await db.job.findMany({
     where: { status: 'open', expiresAt: { lt: new Date() } },
+    select: { id: true, title: true, postedById: true },
+  })
+  if (expired.length === 0) return
+
+  await db.job.updateMany({
+    where: { id: { in: expired.map((j) => j.id) } },
     data: { status: 'expired' },
   })
+
+  // Notify each poster (fire-and-forget)
+  for (const job of expired) {
+    dispatchNotification({
+      userId: job.postedById,
+      type: 'system',
+      title: 'Job listing expired',
+      message: `Your job "${job.title}" has expired. Renew it to keep receiving applications.`,
+      href: `/jobs/${job.id}`,
+      channels: ['inapp', 'email'],
+    }).catch(() => {})
+  }
 }
 
 // ── List / Search ─────────────────────────────────────────────────────────────
@@ -210,10 +229,22 @@ export async function applyToJob(
   const existing = await db.jobApplication.findUnique({ where: { jobId_workerId: { jobId, workerId } } })
   if (existing) throw new AppError('Already applied to this job', 409)
 
-  return db.jobApplication.create({
+  const application = await db.jobApplication.create({
     data: { jobId, workerId, coverLetter, proposedRate },
     include: applicationInclude,
   })
+
+  // Notify job poster about the new application
+  dispatchNotification({
+    userId: job.postedById,
+    type: 'system',
+    title: 'New application received',
+    message: `A worker applied to your job "${job.title}".`,
+    href: `/jobs/${jobId}/applications`,
+    channels: ['inapp'],
+  }).catch(() => {})
+
+  return application
 }
 
 export async function listApplications(jobId: string, userId: string) {
@@ -249,6 +280,22 @@ export async function updateApplicationStatus(
 
   if (status === 'accepted') {
     await db.job.update({ where: { id: jobId }, data: { status: 'filled' } })
+  }
+
+  // Notify the worker (curator who owns the worker profile) about status change
+  const workerRecord = await db.worker.findUnique({
+    where: { id: app.workerId },
+    select: { curatorId: true },
+  })
+  if (workerRecord) {
+    dispatchNotification({
+      userId: workerRecord.curatorId,
+      type: 'system',
+      title: `Application ${status}`,
+      message: `Your application for "${updated.job.title}" has been ${status}.`,
+      href: `/jobs/${jobId}`,
+      channels: ['inapp', 'email'],
+    }).catch(() => {})
   }
 
   return updated

@@ -2,3 +2,4 @@ packages:
   - "packages/api"
   - "packages/app"
   - "packages/contracts"
+  - "packages/sdk"

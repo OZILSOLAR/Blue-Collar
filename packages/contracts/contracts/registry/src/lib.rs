@@ -24,6 +24,9 @@ use soroban_sdk::{
     Symbol, Vec,
 };
 
+/// Event schema version — bump when adding/removing/renaming events.
+pub const VERSION: u32 = 1;
+
 /// Approximate TTL extension target (~1 year at 5 s/ledger).
 const TTL_EXTEND_TO: u32 = 535_000;
 /// Extend TTL only when it drops below this threshold (~6 months).
@@ -210,6 +213,34 @@ pub struct Badge {
     pub active: bool,
 }
 
+/// Verification level for a worker (#778).
+#[contracttype]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum VerificationLevel {
+    /// No verification — default state.
+    None = 0,
+    /// Identity checked by a curator.
+    Basic = 1,
+    /// Credentials and category skills verified.
+    Verified = 2,
+    /// Expert-level — multiple verified credentials and peer reviews.
+    Expert = 3,
+}
+
+/// A certified skill entry for a worker (#778).
+#[contracttype]
+#[derive(Clone)]
+pub struct CertifiedSkill {
+    /// Skill identifier (e.g., "pipe_fitting", "arc_welding").
+    pub skill: Symbol,
+    /// Curator or admin who certified this skill.
+    pub certified_by: Address,
+    /// Unix timestamp when certification was granted.
+    pub certified_at: u64,
+    /// Unix timestamp when certification expires (0 = no expiry).
+    pub expires_at: u64,
+}
+
 /// A single immutable reputation history entry (#677).
 #[contracttype]
 #[derive(Clone)]
@@ -326,6 +357,10 @@ pub enum DataKey {
     ReputationHistory(Symbol),
     /// Persistent storage — [`ReputationInputs`] keyed by worker id (#677).
     ReputationInputs(Symbol),
+    /// Persistent storage — [`VerificationLevel`] keyed by worker id (#778).
+    VerificationLevel(Symbol),
+    /// Persistent storage — `Vec<CertifiedSkill>` keyed by worker id (#778).
+    CertifiedSkills(Symbol),
 }
 
 // =============================================================================
@@ -655,7 +690,7 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
         let pauser_role = Self::role_symbol(&env, ROLE_PAUSER_CACHED);
         Self::require_role(&env, &pauser_role, &admin);
         env.storage().instance().set(&DataKey::Paused, &true);
-        env.events().publish((Symbol::new(&env, "ContractPaused"), admin), ());
+        env.events().publish((symbol_short!("Paused"), admin), ());
     }
 
     /// Unpause the contract, re-enabling all state-mutating operations.
@@ -667,12 +702,12 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
     /// Panics with `"Missing role"` if `admin` does not hold `ROLE_PAUSER`.
     ///
     /// # Events
-    /// Emits `("ContractUnpaused", admin)`.
+    /// Emits `("Unpaused", admin)`.
     pub fn unpause(env: Env, admin: Address) {
         let pauser_role = Self::role_symbol(&env, ROLE_PAUSER_CACHED);
         Self::require_role(&env, &pauser_role, &admin);
         env.storage().instance().set(&DataKey::Paused, &false);
-        env.events().publish((Symbol::new(&env, "ContractUnpaused"), admin), ());
+        env.events().publish((symbol_short!("Unpaused"), admin), ());
     }
 
     /// Returns `true` if the contract is currently paused.
@@ -833,8 +868,6 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
         let key = DataKey::Worker(id.clone());
         env.storage().persistent().set(&key, &worker);
         env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        // Emit Worker TTL extended event
-        env.events().publish((Symbol::new(&env, "WorkerTTLExtended"), id.clone()), ());
 
         let list_key = DataKey::WorkerList;
         let mut list: Vec<Symbol> = env
@@ -845,8 +878,6 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
         list.push_back(id.clone());
         env.storage().persistent().set(&list_key, &list);
         env.storage().persistent().extend_ttl(&list_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        // Emit WorkerList TTL extended event
-        env.events().publish((Symbol::new(&env, "WorkerListTTLExtended"), ()), ());
 
         // #529: Maintain WorkerCount for efficient pagination.
         let count: u32 = env
@@ -859,7 +890,7 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
             .set(&DataKey::WorkerCount, &(count + 1));
 
         env.events().publish(
-            (Symbol::new(&env, "WorkerRegistered"), id),
+            (symbol_short!("WrkReg"), id),
             (owner, category),
         );
     }
@@ -893,7 +924,7 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
         let new_status = worker.is_active;
         env.storage().persistent().set(&DataKey::Worker(id.clone()), &worker);
 
-        env.events().publish((Symbol::new(&env, "WorkerToggled"), id), new_status);
+        env.events().publish((symbol_short!("WrkTgl"), id), new_status);
     }
 
     /// Update a worker's name, category, location hash, and contact hash. Owner only.
@@ -1121,6 +1152,11 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
     /// Returns `true` if the contract has been initialised.
     pub fn is_initialized(env: Env) -> bool {
         env.storage().persistent().has(&DataKey::Admin)
+    }
+
+    /// Return the event schema version.
+    pub fn version(_env: Env) -> u32 {
+        VERSION
     }
 
      /// Get the admin address.
@@ -1552,8 +1588,6 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
         worker.avg_rating = avg_rating;
         env.storage().persistent().set(&DataKey::Worker(id.clone()), &worker);
         env.storage().persistent().extend_ttl(&DataKey::Worker(id.clone()), TTL_THRESHOLD, TTL_EXTEND_TO);
-        // Emit Worker TTL extended event
-        env.events().publish((Symbol::new(&env, "WorkerTTLExtended"), id.clone()), ());
 
         env.events().publish((symbol_short!("RevUpd"), id), (review_count, avg_rating));
     }
@@ -1639,8 +1673,6 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
 
         env.storage().persistent().set(&DataKey::Worker(id.clone()), &worker);
         env.storage().persistent().extend_ttl(&DataKey::Worker(id.clone()), TTL_THRESHOLD, TTL_EXTEND_TO);
-        // Emit Worker TTL extended event
-        env.events().publish((Symbol::new(&env, "WorkerTTLExtended"), id.clone()), ());
 
         env.events().publish((symbol_short!("SubRnw"), id), new_expires_at);
     }
@@ -1850,6 +1882,46 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
     /// Maximum number of workers that can be registered in a single batch call.
     pub const MAX_BATCH_SIZE: u32 = 20;
 
+    /// Toggle the `is_active` status of multiple workers in one transaction. Curator only.
+    ///
+    /// Skips workers not owned by `caller` rather than aborting the batch.
+    ///
+    /// # Parameters
+    /// - `caller`: Must be an approved curator; `require_auth()` is enforced.
+    /// - `ids`: Worker ids to toggle (max [`MAX_BATCH_SIZE`] entries).
+    ///
+    /// # Returns
+    /// A `Vec<(Symbol, bool)>` of `(id, new_is_active)` for each successfully toggled worker.
+    ///
+    /// # Panics
+    /// - `"Caller is not a curator"` if `caller` is not in the curator list.
+    /// - `"Batch too large"` if `ids.len() > MAX_BATCH_SIZE`.
+    ///
+    /// # Events
+    /// Emits `("WrkTgl", id)` with data `new_is_active` for each toggled worker.
+    pub fn batch_toggle(env: Env, caller: Address, ids: Vec<Symbol>) -> Vec<Symbol> {
+        caller.require_auth();
+        Self::require_not_paused(&env);
+        assert!(
+            Self::get_curators(&env).iter().any(|c| c == caller),
+            "Caller is not a curator"
+        );
+        assert!(ids.len() <= Self::MAX_BATCH_SIZE, "Batch too large");
+
+        let mut toggled: Vec<Symbol> = Vec::new(&env);
+        for id in ids.iter() {
+            let key = DataKey::Worker(id.clone());
+            if let Some(mut worker) = env.storage().persistent().get::<DataKey, Worker>(&key) {
+                worker.is_active = !worker.is_active;
+                let new_status = worker.is_active;
+                env.storage().persistent().set(&key, &worker);
+                env.events().publish((symbol_short!("WrkTgl"), id.clone()), new_status);
+                toggled.push_back(id);
+            }
+        }
+        toggled
+    }
+
     /// Register multiple workers in one transaction. Curator only.
     ///
     /// Processes up to [`MAX_BATCH_SIZE`] entries. Duplicate ids are skipped
@@ -1928,8 +2000,6 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
 
             env.storage().persistent().set(&key, &worker);
         env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        // Emit Worker TTL extended event
-        env.events().publish((Symbol::new(&env, "WorkerTTLExtended"), id.clone()), ());
             list.push_back(id.clone());
 
             env.events().publish(
@@ -1942,8 +2012,6 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
 
         env.storage().persistent().set(&list_key, &list);
         env.storage().persistent().extend_ttl(&list_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        // Emit WorkerList TTL extended event
-        env.events().publish((Symbol::new(&env, "WorkerListTTLExtended"), ()), ());
 
         results
     }
@@ -2587,6 +2655,180 @@ fn role_to_id_with_env(env: &Env, role: &Symbol) -> u64 {
     /// Get the pending upgrade, if any.
     pub fn get_pending_upgrade(env: Env) -> Option<PendingUpgrade> {
         env.storage().persistent().get(&DataKey::PendingUpgrade)
+    }
+
+    // -------------------------------------------------------------------------
+    // Verification levels & certified skills (#778)
+    // -------------------------------------------------------------------------
+
+    /// Set the verification level for a worker. Admin or curator-manager only.
+    ///
+    /// # Parameters
+    /// - `caller`: Must hold `ROLE_CURATOR_MGR` or `ROLE_ADMIN`; `require_auth()` enforced.
+    /// - `worker_id`: The worker's unique identifier.
+    /// - `level`: The new [`VerificationLevel`] to assign.
+    ///
+    /// # Panics
+    /// - `"Missing role"` if caller lacks the required role.
+    /// - `"Worker not found"` if no worker exists with the given `worker_id`.
+    ///
+    /// # Events
+    /// Emits `("VrfLvlSet", worker_id)` with data `(caller, level as u32)`.
+    pub fn set_verification_level(
+        env: Env,
+        caller: Address,
+        worker_id: Symbol,
+        level: VerificationLevel,
+    ) {
+        let curator_mgr = Self::role_symbol(&env, ROLE_CURATOR_MGR_CACHED);
+        Self::require_role(&env, &curator_mgr, &caller);
+        Self::require_not_paused(&env);
+        assert!(
+            env.storage().persistent().has(&DataKey::Worker(worker_id.clone())),
+            "Worker not found"
+        );
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::VerificationLevel(worker_id.clone()), &level);
+
+        env.events().publish(
+            (symbol_short!("VrfLvlSet"), worker_id),
+            (caller, level as u32),
+        );
+    }
+
+    /// Get the verification level for a worker.
+    ///
+    /// Returns [`VerificationLevel::None`] if no level has been set.
+    pub fn get_verification_level(env: Env, worker_id: Symbol) -> VerificationLevel {
+        env.storage()
+            .persistent()
+            .get(&DataKey::VerificationLevel(worker_id))
+            .unwrap_or(VerificationLevel::None)
+    }
+
+    /// Add or update a certified skill for a worker. Admin or curator-manager only.
+    ///
+    /// Replaces an existing entry for the same `skill` symbol. Appends if new.
+    ///
+    /// # Parameters
+    /// - `caller`: Must hold `ROLE_CURATOR_MGR` or `ROLE_ADMIN`.
+    /// - `worker_id`: The worker's unique identifier.
+    /// - `skill`: Skill symbol (e.g., `Symbol::new(&env, "arc_welding")`).
+    /// - `expires_at`: Unix timestamp when the cert expires (0 = no expiry).
+    ///
+    /// # Panics
+    /// - `"Missing role"` if caller lacks the required role.
+    /// - `"Worker not found"` if no worker exists with the given `worker_id`.
+    ///
+    /// # Events
+    /// Emits `("SkillCert", worker_id, skill)` with data `(caller, expires_at)`.
+    pub fn add_certified_skill(
+        env: Env,
+        caller: Address,
+        worker_id: Symbol,
+        skill: Symbol,
+        expires_at: u64,
+    ) {
+        let curator_mgr = Self::role_symbol(&env, ROLE_CURATOR_MGR_CACHED);
+        Self::require_role(&env, &curator_mgr, &caller);
+        Self::require_not_paused(&env);
+        assert!(
+            env.storage().persistent().has(&DataKey::Worker(worker_id.clone())),
+            "Worker not found"
+        );
+
+        let now = env.ledger().timestamp();
+        let entry = CertifiedSkill {
+            skill: skill.clone(),
+            certified_by: caller.clone(),
+            certified_at: now,
+            expires_at,
+        };
+
+        let mut skills: Vec<CertifiedSkill> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::CertifiedSkills(worker_id.clone()))
+            .unwrap_or(Vec::new(&env));
+
+        // Replace existing entry for the same skill, or append.
+        let mut found = false;
+        let mut updated: Vec<CertifiedSkill> = Vec::new(&env);
+        for s in skills.iter() {
+            if s.skill == skill {
+                updated.push_back(entry.clone());
+                found = true;
+            } else {
+                updated.push_back(s);
+            }
+        }
+        if !found {
+            updated.push_back(entry);
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::CertifiedSkills(worker_id.clone()), &updated);
+
+        env.events().publish(
+            (symbol_short!("SkillCert"), worker_id, skill),
+            (caller, expires_at),
+        );
+    }
+
+    /// Revoke a certified skill from a worker. Admin or curator-manager only.
+    ///
+    /// # Panics
+    /// - `"Missing role"` if caller lacks the required role.
+    /// - `"Skill not found"` if the skill is not in the worker's certified list.
+    ///
+    /// # Events
+    /// Emits `("SkillRvkd", worker_id, skill)` with data `caller`.
+    pub fn revoke_certified_skill(
+        env: Env,
+        caller: Address,
+        worker_id: Symbol,
+        skill: Symbol,
+    ) {
+        let curator_mgr = Self::role_symbol(&env, ROLE_CURATOR_MGR_CACHED);
+        Self::require_role(&env, &curator_mgr, &caller);
+        Self::require_not_paused(&env);
+
+        let skills: Vec<CertifiedSkill> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::CertifiedSkills(worker_id.clone()))
+            .unwrap_or(Vec::new(&env));
+
+        let mut updated: Vec<CertifiedSkill> = Vec::new(&env);
+        let mut removed = false;
+        for s in skills.iter() {
+            if s.skill == skill {
+                removed = true;
+            } else {
+                updated.push_back(s);
+            }
+        }
+        assert!(removed, "Skill not found");
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::CertifiedSkills(worker_id.clone()), &updated);
+
+        env.events().publish(
+            (symbol_short!("SkillRvkd"), worker_id, skill),
+            caller,
+        );
+    }
+
+    /// Get all certified skills for a worker.
+    pub fn get_certified_skills(env: Env, worker_id: Symbol) -> Vec<CertifiedSkill> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::CertifiedSkills(worker_id))
+            .unwrap_or(Vec::new(&env))
     }
 }
 

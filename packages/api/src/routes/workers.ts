@@ -11,6 +11,7 @@ import {
   deleteWorker,
   toggleActivation,
   advancedSearch,
+  searchWorkersHandler,
   getReputation,
   syncReputation,
 } from '../controllers/workers.js'
@@ -55,6 +56,7 @@ async function showWorkerWithRatings(req: Request, res: Response) {
 }
 
 router.get('/', generalRateLimit, cacheMiddleware(TTL.SHORT), listWorkers)
+router.get('/search', generalRateLimit, cacheMiddleware(TTL.SHORT), searchWorkersHandler)
 router.get('/search/advanced', generalRateLimit, cacheMiddleware(TTL.SHORT), advancedSearch)
 router.get('/mine', authenticate, authorize('curator', 'admin'), listMyWorkers)
 router.get('/mine', withAuth(['curator', 'admin']), listMyWorkers)

@@ -90,6 +90,9 @@ app.use('/api/conversations', conversationRoutes)
 app.use('/api/reviews', helpfulRoutes)
 app.use('/api/auth', devicesRoutes)
 app.use('/api', vitalsRoutes)
+app.use('/api/wallet', walletRoutes)
+app.use('/api/events', indexerRoutes)
+app.use('/api/escrow', escrowRoutes)
 // ── Versioned routes (v1) ─────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/categories', categoryRoutes)
@@ -130,10 +133,12 @@ app.use('/api/v2/payments', paymentRoutes)
 app.use('/api/v2/notifications', notificationRoutes)
 app.use('/api/v2/conversations', conversationRoutes)
 app.use('/api/v2/reviews', helpfulRoutes)
+app.use('/api/v2/wallet', walletRoutes)
+app.use('/api/v2/events', indexerRoutes)
+app.use('/api/v2/escrow', escrowRoutes)
 
 // ── Version endpoint ──────────────────────────────────────────────────────────
 app.get('/api/version', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   res.json({
     apiPackageVersion: API_VERSION,
     apiVersions: Array.from(VERSION_CONFIG.supported),
@@ -144,7 +149,6 @@ app.get('/api/version', (_req, res) => {
 })
 
 app.get('/api/v1/version', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   res.json({
     version: API_VERSION,
     apiVersion: 'v1',
@@ -156,7 +160,6 @@ app.get('/api/v1/version', (_req, res) => {
 })
 
 app.get('/api/v2/version', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   res.json({
     version: API_VERSION,
     apiVersion: 'v2',
@@ -168,7 +171,6 @@ app.get('/api/v2/version', (_req, res) => {
 })
 
 app.get('/api/v1/versions', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   const versionInfo = Array.from(VERSION_CONFIG.supported).map(v => ({
     version: v,
     status: VERSION_CONFIG.deprecated.includes(v) ? 'deprecated' : 'current',
@@ -183,7 +185,6 @@ app.get('/api/v1/versions', (_req, res) => {
 })
 
 app.get('/api/v2/versions', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   const versionInfo = Array.from(VERSION_CONFIG.supported).map(v => ({
     version: v,
     status: VERSION_CONFIG.deprecated.includes(v) ? 'deprecated' : 'current',
@@ -214,7 +215,8 @@ app.put('/api/v2/admin/rollout', updateRolloutEndpoint)
 
 // ── Redirect unversioned /api/* → /api/v1/* with deprecation headers ──────────
 app.use('/api', deprecationWarning, (req, res) => {
-  const target = `/api/v1${req.path}${req.search ?? (Object.keys(req.query).length ? '?' + new URLSearchParams(req.query as any).toString() : '')}`
+  const qs = Object.keys(req.query).length ? '?' + new URLSearchParams(req.query as any).toString() : ''
+  const target = `/api/v1${req.path}${qs}`
   res.redirect(301, target)
 })
 
