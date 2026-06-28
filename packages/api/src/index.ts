@@ -12,6 +12,7 @@ import { env } from './config/env.js'
 import pinoHttp from 'pino-http'
 import methodOverride from 'method-override'
 import passport from './config/passport.js'
+import { compress } from './middleware/compress.js'
 import authRoutes from './routes/auth.js'
 import categoryRoutes from './routes/categories.js'
 import workerRoutes from './routes/workers.js'
@@ -52,6 +53,7 @@ app.use(helmet({
   noSniff: true,
 }))
 
+app.use(compress())
 app.use(cors(corsConfig))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))

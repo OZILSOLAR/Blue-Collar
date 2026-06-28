@@ -21,14 +21,33 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+// Parse a comma-separated ?fields= query param into a set for O(1) lookup.
+// An empty/absent param means "return all fields".
+function parseFields(raw: unknown): Set<string> | null {
+  if (!raw) return null
+  const fields = String(raw).split(',').map(f => f.trim()).filter(Boolean)
+  return fields.length > 0 ? new Set(fields) : null
+}
+
+// Apply a sparse fieldset to an object, keeping only the requested keys.
+function sparseFields(
+  obj: Record<string, unknown>,
+  fields: Set<string> | null,
+): Record<string, unknown> {
+  if (!fields) return obj
+  return Object.fromEntries([...fields].filter(f => f in obj).map(f => [f, obj[f]]))
+}
+
 export async function listWorkers(req: Request, res: Response) {
   const {
     category, page, cursor, limit = '20', lat, lng, radius,
     search, lang, city, state, country,
     minRating, maxRating, available, listedSince,
     categories, sortBy, sortOrder, isVerified,
+    fields: fieldsParam,
   } = req.query
   const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 100)
+  const fieldSet = parseFields(fieldsParam)
 
   if (!page && !lat && !lng) {
     const categoryIds = categories
@@ -79,9 +98,12 @@ export async function listWorkers(req: Request, res: Response) {
       orderBy: { createdAt: 'desc' },
     })
     const data = rows.slice(0, limitNum)
+    const collection = WorkerCollection(data as any).map(
+      w => sparseFields(w as Record<string, unknown>, fieldSet),
+    )
 
     return res.json({
-      data: WorkerCollection(data as any),
+      data: collection,
       nextCursor: rows.length > limitNum ? data[data.length - 1]?.id ?? null : null,
       limit: limitNum,
       status: 'success',
@@ -120,7 +142,10 @@ export async function listWorkers(req: Request, res: Response) {
 
     const pageNum = Number(page)
     const paginated = withDistance.slice((pageNum - 1) * limitNum, pageNum * limitNum)
-    return res.json({ data: paginated, status: 'success', code: 200 })
+    const geoData = fieldSet
+      ? paginated.map(w => sparseFields(w as Record<string, unknown>, fieldSet))
+      : paginated
+    return res.json({ data: geoData, status: 'success', code: 200 })
   }
 
   // Parse multi-category: ?categories=id1,id2,id3
@@ -147,7 +172,10 @@ export async function listWorkers(req: Request, res: Response) {
     isVerified: isVerified !== undefined ? isVerified === 'true' : undefined,
   })
 
-  return res.json({ ...result, status: 'success', code: 200 })
+  const resultData = fieldSet && Array.isArray((result as any).data)
+    ? { ...result, data: (result as any).data.map((w: Record<string, unknown>) => sparseFields(w, fieldSet)) }
+    : result
+  return res.json({ ...resultData, status: 'success', code: 200 })
 }
 
 /**

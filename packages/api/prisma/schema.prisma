@@ -129,6 +129,12 @@ model Worker {
   jobApplications     JobApplication[]
   profileViews        ProfileView[]
   analytics           WorkerAnalytics?
+
+  @@index([isActive, categoryId])
+  @@index([curatorId])
+  @@index([locationId])
+  @@index([createdAt])
+  @@index([deletedAt])
 }
 
 model Bookmark {
@@ -150,6 +156,8 @@ model PushSubscription {
   auth      String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Availability {
@@ -161,6 +169,9 @@ model Availability {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, dayOfWeek])
+  @@index([workerId])
 }
 
 model PortfolioItem {
@@ -172,6 +183,8 @@ model PortfolioItem {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([workerId])
 }
 
 model Review {
@@ -195,6 +208,9 @@ model Review {
   updatedAt   DateTime      @updatedAt
 
   @@unique([userId, workerId])
+  @@index([workerId])
+  @@index([workerId, status])
+  @@index([authorId])
 }
 
 model Subscription {
@@ -224,6 +240,10 @@ model Dispute {
   worker       Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
   filedBy      User          @relation("DisputesFiled", fields: [filedById], references: [id], onDelete: Cascade)
   resolvedBy   User?         @relation("DisputesResolved", fields: [resolvedById], references: [id])
+
+  @@index([workerId])
+  @@index([filedById])
+  @@index([status])
 }
 
 model UserInteraction {
@@ -318,6 +338,7 @@ model ContactRequest {
   fromUser    User                 @relation(fields: [fromUserId], references: [id], onDelete: Cascade)
 
   @@index([workerId])
+  @@index([workerId, status])
 }
 
 // ─── Issue #331: Worker Insurance Verification ───────────────────────────────
@@ -511,8 +532,9 @@ model ContractEvent {
 
   @@unique([contractId, ledger, txIndex, eventIndex])
   @@index([contractId])
+  @@index([contractId, eventName])
+  @@index([contractId, eventName, ledger])
   @@index([ledger])
-  @@index([eventName])
   @@index([createdAt])
 }
 
@@ -741,6 +763,7 @@ model ReviewHelpful {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([reviewId, userId])
+  @@index([reviewId])
 }
 
 // ─── Issue #messaging: Conversations & Messages ─────────────────────────────
@@ -764,6 +787,7 @@ model ConversationParticipant {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
+  @@index([userId])
 }
 
 model Message {
