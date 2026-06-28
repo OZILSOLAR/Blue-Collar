@@ -4,10 +4,9 @@ import { initializeTracing } from './monitoring/tracing.js'
 initializeTracing()
 
 import express from 'express'
-import cors from 'cors'
-import helmet from 'helmet'
 import { createServer } from 'http'
-import { corsConfig } from './config/cors.js'
+import { applySecurity, depthLimiter } from './middleware/security.js'
+import { sanitize, sanitizeParams } from './middleware/sanitize.js'
 import { env } from './config/env.js'
 import pinoHttp from 'pino-http'
 import methodOverride from 'method-override'
@@ -29,10 +28,6 @@ import { WebSocketServer } from './websocket/server.js'
 
 const app = express()
 const PORT = env.PORT || 3000
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean)
-  : []
-const connectSrc = ["'self'", ...allowedOrigins]
 
 app.disable('x-powered-by')
 app.use(helmet({

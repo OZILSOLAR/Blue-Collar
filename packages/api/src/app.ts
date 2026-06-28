@@ -1,11 +1,11 @@
 import express from 'express'
-import cors from 'cors'
 import methodOverride from 'method-override'
 import passport from './config/passport.js'
 import { redis, cacheMetrics } from './config/redis.js'
 import { db } from './db.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { registerEventHandlers } from './events/index.js'
+import { applySecurity, depthLimiter } from './middleware/security.js'
 import authRoutes from './routes/auth.js'
 import categoryRoutes from './routes/categories.js'
 import workerRoutes from './routes/workers.js'
@@ -28,7 +28,7 @@ import helpfulRoutes from './routes/helpful.js'
 import vitalsRoutes from './routes/vitals.js'
 import devicesRoutes from './routes/devices.js'
 import { auditMiddleware } from './middleware/audit.js'
-import { sanitize } from './middleware/sanitize.js'
+import { sanitize, sanitizeParams } from './middleware/sanitize.js'
 import { versionMiddleware, deprecationWarning, versionDeprecationMiddleware } from './middleware/version.js'
 import { responseSchemaVersioning } from './utils/schemaVersioning.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
@@ -54,10 +54,12 @@ registerEventHandlers()
 // Connect Redis (non-blocking — app starts even if Redis is down)
 redis.connect().catch(() => {})
 
-app.use(cors())
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+applySecurity(app)
+app.use(express.json({ limit: '100kb' }))
+app.use(express.urlencoded({ extended: true, limit: '100kb' }))
 app.use(sanitize)
+app.use(sanitizeParams)
+app.use(depthLimiter)
 app.use(metricsMiddleware)
 app.use(requestLogger)
 app.use(methodOverride('X-HTTP-Method'))
