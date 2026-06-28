@@ -781,6 +781,38 @@ model Message {
   @@index([conversationId, createdAt])
 }
 
+// ── Booking models — Issue #776 ───────────────────────────────────────────────
+
+model Booking {
+  id                  String        @id @default(cuid())
+  workerId            String
+  requesterId         String
+  /// ISO 8601 stored as UTC
+  startTime           DateTime
+  /// ISO 8601 stored as UTC
+  endTime             DateTime
+  /// IANA timezone name the requester submitted in
+  timezone            String        @default("UTC")
+  serviceDescription  String
+  note                String?
+  status              BookingStatus @default(pending)
+  cancellationReason  String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  worker    Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  requester User   @relation("BookingRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([workerId, startTime])
+  @@index([requesterId, startTime])
+  @@index([workerId, status])
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+  completed
 // ─── Issue #749: Device & Session Management ─────────────────────────────────
 
 model Device {
