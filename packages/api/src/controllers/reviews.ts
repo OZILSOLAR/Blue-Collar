@@ -65,3 +65,37 @@ export const moderateReview = catchAsync(async (req: Request, res: Response) => 
 
   res.json({ data: updated, status: 'success', message: `Review ${action}ed`, code: 200 })
 })
+
+export const getReviewReports = catchAsync(async (req: Request, res: Response) => {
+  const page = Math.max(1, parseInt(req.query.page as string) || 1)
+  const limit = Math.min(100, parseInt(req.query.limit as string) || 20)
+
+  const [reports, total] = await Promise.all([
+    db.review.findMany({
+      where: { flagged: true },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        worker: { select: { id: true, name: true } },
+        author: { select: { id: true, firstName: true, lastName: true } },
+      },
+    }),
+    db.review.count({ where: { flagged: true } }),
+  ])
+
+  res.json({
+    data: reports,
+    meta: { total, page, limit, pages: Math.ceil(total / limit) },
+    status: 'success',
+    code: 200,
+  })
+})
+
+export const reportReview = catchAsync(async (req: Request, res: Response) => {
+  const { reason } = req.body
+  if (!reason) throw new AppError('reason is required', 400)
+
+  const review = await reviewService.flagReview(req.params.reviewId, reason)
+  res.json({ data: review, status: 'success', message: 'Review reported', code: 200 })
+})

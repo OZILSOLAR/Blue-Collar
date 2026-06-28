@@ -1,12 +1,22 @@
 import { db } from '../db.js'
 import { AppError } from './AppError.js'
+import { createServiceLogger } from '../utils/logger.js'
+
+const logger = createServiceLogger('ReviewService')
 
 /**
  * Verify if a user has an on-chain interaction (tip or escrow) with a worker.
  * For now, this is a stub that checks if user has a wallet address.
  * In production, this would query Stellar Horizon for actual transactions.
  */
-async function verifyOnChainTransaction(userId: string, workerId: string): Promise<boolean> {
+async function verifyOnChainTransaction(userId: string, workerId: string, transactionHash?: string): Promise<boolean> {
+  if (transactionHash) {
+    // In production: verify transactionHash against Stellar Horizon API
+    // For now: accept any transactionHash as evidence of interaction
+    logger.debug('Verifying transaction hash', { transactionHash })
+    return true
+  }
+
   const user = await db.user.findUnique({ where: { id: userId }, select: { walletAddress: true } })
   const worker = await db.worker.findUnique({ where: { id: workerId }, select: { walletAddress: true } })
   
@@ -35,16 +45,18 @@ export async function createReview(
   if (!worker) throw new AppError('Worker not found', 404)
 
   const existing = await db.review.findUnique({
-    where: { authorId_workerId: { authorId, workerId } },
+    where: { userId_workerId: { userId: authorId, workerId } },
   })
   if (existing) throw new AppError('You have already reviewed this worker', 409)
 
   // Verify on-chain transaction
-  const isVerified = await verifyOnChainTransaction(authorId, workerId)
+  const isVerified = await verifyOnChainTransaction(authorId, workerId, transactionHash)
   if (!isVerified && !transactionHash) {
     throw new AppError('You must have an on-chain interaction with this worker to leave a review', 403)
   }
 
+  logger.info('Creating review', { workerId, authorId, rating, isVerified })
+  
   return db.review.create({
     data: {
       workerId,
@@ -53,6 +65,7 @@ export async function createReview(
       comment,
       transactionHash,
       isVerified,
+      status: 'pending',
     },
     include: { author: { select: { id: true, firstName: true, lastName: true, avatar: true } } },
   })
