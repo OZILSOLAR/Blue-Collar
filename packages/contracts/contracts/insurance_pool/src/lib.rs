@@ -221,7 +221,7 @@ impl InsurancePoolContract {
         contributor.require_auth();
 
         let token_client = token::Client::new(&env, &token);
-        token_client.transfer_from(&contributor, &env.current_contract_address(), &amount);
+        token_client.transfer_from(&env.current_contract_address(), &contributor, &env.current_contract_address(), &amount);
 
         let mut members: Vec<PoolMember> = env
             .storage()
@@ -230,10 +230,12 @@ impl InsurancePoolContract {
             .unwrap_or(Vec::new(&env));
 
         let mut found = false;
-        for member in members.iter_mut() {
+        for i in 0..members.len() {
+            let mut member = members.get(i).unwrap();
             if member.address == contributor {
                 member.contribution = member.contribution.saturating_add(amount);
                 member.last_contribution_at = env.ledger().timestamp();
+                members.set(i, member);
                 found = true;
                 break;
             }
@@ -463,19 +465,24 @@ impl InsurancePoolContract {
 }
 
 #[cfg(test)]
+mod test;
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::testutils::{Address as _, Ledger};
+    use soroban_sdk::testutils::Address as _;
 
     #[test]
     fn test_initialize() {
         let env = Env::default();
-        let admin = Address::random(&env);
-        let token = Address::random(&env);
-        InsurancePoolContract::initialize(env.clone(), admin.clone(), token, 100);
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let token = Address::generate(&env);
+        env.register_stellar_asset_contract_v2(token.clone());
+        let contract = env.register_contract(None, InsurancePoolContract);
+        let client = InsurancePoolContractClient::new(&env, &contract);
+        client.initialize(&admin, &token, &100);
         assert!(env
-            .storage()
-            .instance()
-            .has(&DataKey::Admin));
+            .as_contract(&contract, || { env.storage().instance().has(&DataKey::Admin) }));
     }
 }
