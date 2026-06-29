@@ -25,7 +25,8 @@ extern crate std;
 use super::*;
 use soroban_sdk::{
     testutils::Address as _,
-    Address, BytesN, Env, String, Symbol,
+    token::StellarAssetClient,
+    Address, BytesN, Env, String, Symbol, Vec,
 };
 
 // ===========================================================================
@@ -692,5 +693,195 @@ mod verification_levels {
         let f = setup();
         let id = f.register("w1");
         assert_eq!(f.client().get_certified_skills(&id).len(), 0);
+    }
+}
+
+// ===========================================================================
+// 7. Auth-failure tests for remaining role-gated functions
+// ===========================================================================
+
+mod auth_failures {
+    use super::*;
+
+    // -- Role-management auth failures --
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn grant_role_requires_admin() {
+        let f = UpgradeFixture::new();
+        let role = Symbol::new(&f.env, ROLE_PAUSER);
+        f.client().grant_role(&f.owner, &role, &Address::generate(&f.env));
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn revoke_role_requires_admin() {
+        let f = UpgradeFixture::new();
+        let role = Symbol::new(&f.env, ROLE_PAUSER);
+        f.client().revoke_role(&f.owner, &role, &f.admin);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn pause_requires_pauser() {
+        let f = UpgradeFixture::new();
+        f.client().pause(&f.curator);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn unpause_requires_pauser() {
+        let f = UpgradeFixture::new();
+        // admin holds PAUSER, curator does not
+        f.client().pause(&f.admin);
+        f.client().unpause(&f.curator);
+    }
+
+    // -- Curator management auth failures --
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn add_curator_requires_curator_mgr() {
+        let f = UpgradeFixture::new();
+        f.client().add_curator(&f.curator, &Address::generate(&f.env));
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn remove_curator_requires_curator_mgr() {
+        let f = UpgradeFixture::new();
+        f.client().add_curator(&f.admin, &f.curator);
+        f.client().remove_curator(&f.curator, &f.curator);
+    }
+
+    // -- Worker registration auth failures --
+
+    #[test]
+    #[should_panic(expected = "Caller is not a curator")]
+    fn register_requires_curator() {
+        let f = UpgradeFixture::new();
+        f.client().register(
+            &Symbol::new(&f.env, "w1"),
+            &f.owner,
+            &String::from_str(&f.env, "Alice"),
+            &Symbol::new(&f.env, "plumber"),
+            &f.zero_hash(),
+            &f.zero_hash(),
+            &f.owner,  // owner is not a curator
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Caller is not a curator")]
+    fn batch_toggle_requires_curator() {
+        let f = UpgradeFixture::new();
+        let ids = Vec::from_array(&f.env, [Symbol::new(&f.env, "w1")]);
+        f.client().batch_toggle(&f.owner, &ids);
+    }
+
+    #[test]
+    #[should_panic(expected = "Caller is not a curator")]
+    fn batch_register_requires_curator() {
+        let f = UpgradeFixture::new();
+        f.client().batch_register(
+            &f.owner,
+            &Vec::new(&f.env),
+            &Vec::new(&f.env),
+            &Vec::new(&f.env),
+            &Vec::new(&f.env),
+            &Vec::new(&f.env),
+            &Vec::new(&f.env),
+        );
+    }
+
+    // -- Worker owner-role auth failures --
+
+    #[test]
+    #[should_panic(expected = "Not authorized")]
+    fn toggle_requires_owner() {
+        let f = UpgradeFixture::new();
+        let id = f.register("toggle_auth");
+        f.client().toggle(&id, &f.curator);
+    }
+
+    #[test]
+    #[should_panic(expected = "Not authorized")]
+    fn deregister_requires_owner() {
+        let f = UpgradeFixture::new();
+        let id = f.register("dereg_auth");
+        f.client().deregister(&id, &f.curator);
+    }
+
+    #[test]
+    #[should_panic(expected = "Not authorized")]
+    fn stake_requires_owner() {
+        let f = UpgradeFixture::new();
+        let id = f.register("stake_auth");
+        // Use a random token for staking
+        let token_id = f.env.register_stellar_asset_contract_v2(f.admin.clone());
+        let token_addr = token_id.address();
+        StellarAssetClient::new(&f.env, &token_addr).mint(&f.owner, &10_000);
+        f.client().stake(&f.curator, &id, &token_addr, &1_000);
+    }
+
+    // -- Reputation management auth failures --
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn update_reputation_requires_rep_mgr() {
+        let f = UpgradeFixture::new();
+        let id = f.register("rep_auth");
+        f.client().update_reputation(&f.curator, &id, &5_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn update_reviews_requires_admin() {
+        let f = UpgradeFixture::new();
+        let id = f.register("rev_auth");
+        f.client().update_reviews(&f.curator, &id, &10, &8_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn update_subscription_requires_admin() {
+        let f = UpgradeFixture::new();
+        let id = f.register("sub_auth");
+        f.client().update_subscription(&f.curator, &id, &1, &0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn update_metrics_requires_rep_mgr() {
+        let f = UpgradeFixture::new();
+        let id = f.register("metric_auth");
+        f.client().update_metrics(&f.curator, &id, &5, &8_000);
+    }
+
+    // -- Category management auth failures --
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn add_category_requires_admin() {
+        let f = UpgradeFixture::new();
+        f.client().add_category(&f.curator, &Symbol::new(&f.env, "electrician"));
+    }
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn remove_category_requires_admin() {
+        let f = UpgradeFixture::new();
+        f.client().remove_category(&f.curator, &Symbol::new(&f.env, "plumber"));
+    }
+
+    // -- Upgrade auth failures --
+
+    #[test]
+    #[should_panic(expected = "Missing role")]
+    fn cancel_upgrade_requires_upgrader() {
+        let f = UpgradeFixture::new();
+        let hash = BytesN::from_array(&f.env, &[9u8; 32]);
+        f.client().propose_upgrade(&f.admin, &hash);
+        f.client().cancel_upgrade(&f.curator);
     }
 }

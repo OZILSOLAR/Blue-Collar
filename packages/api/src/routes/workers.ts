@@ -21,7 +21,7 @@ import { getAvailability, upsertAvailability, addAvailabilitySlot, deleteAvailab
 import { registerOnChain } from '../controllers/stellar.js'
 import { createContactRequest, getContactRequests, updateContactRequestStatus } from '../controllers/contact-request.js'
 import { getWorkerVerifications } from '../controllers/verifications.js'
-import { getAnalytics, trackView, getViewTrends } from '../controllers/analytics.js'
+import { getAnalytics, trackView, getViewTrends, getWorkerPersonalDashboard, exportWorkerPersonalCsv } from '../controllers/analytics.js'
 import { authenticate, authorize } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { withAuth, withAuthAndValidation } from '../middleware/composition.js'
@@ -107,6 +107,8 @@ router.get('/:id/verifications', withAuth(['curator', 'admin']), getWorkerVerifi
 
 // Analytics
 router.post('/:id/analytics/view', trackView)
+router.get('/:id/analytics/dashboard', authenticate, authorize('curator', 'admin'), getWorkerPersonalDashboard)
+router.get('/:id/analytics/export', authenticate, authorize('curator', 'admin'), exportWorkerPersonalCsv)
 router.get('/:id/analytics', authenticate, authorize('curator', 'admin'), getAnalytics)
 router.get('/:id/analytics/trends', authenticate, authorize('curator', 'admin'), getViewTrends)
 router.get('/:id/analytics', withAuth(['curator', 'admin']), getAnalytics)
