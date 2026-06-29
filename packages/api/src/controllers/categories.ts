@@ -3,31 +3,24 @@ import * as categoryService from '../services/category.service.js'
 import { handleError } from '../utils/handleError.js'
 import { CategoryResource, CategoryCollection } from '../resources/index.js'
 import { ErrorMessages, HttpStatus } from '../constants/index.js'
+import { sendSuccess, sendError } from '../utils/response.js'
 
-/**
- * GET /api/categories
- * List all available worker categories.
- */
 export async function listCategories(_req: Request, res: Response) {
   try {
     const categories = await categoryService.listCategories()
-    return res.json({ data: CategoryCollection(categories as any), status: 'success', code: 200 })
+    return sendSuccess(res, CategoryCollection(categories as any))
   } catch (err) {
     return handleError(res, err)
   }
 }
 
-/**
- * GET /api/categories/:id
- * Get a single category by id.
- */
 export async function getCategory(req: Request, res: Response) {
   try {
     const category = await categoryService.getCategory(req.params.id as string)
     if (!category) {
-      return res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: ErrorMessages.CATEGORY_NOT_FOUND, code: HttpStatus.NOT_FOUND })
+      return sendError(res, ErrorMessages.CATEGORY_NOT_FOUND, HttpStatus.NOT_FOUND)
     }
-    return res.json({ data: CategoryResource(category as any), status: 'success', code: 200 })
+    return sendSuccess(res, CategoryResource(category as any))
   } catch (err) {
     return handleError(res, err)
   }

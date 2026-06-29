@@ -34,7 +34,7 @@ const TTL_THRESHOLD: u32 = 267_500;
 
 /// Dispute lifecycle phase.
 #[contracttype]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisputeStatus {
     /// Dispute filed; tokens locked; awaiting evidence.
     Open = 0,
@@ -48,7 +48,7 @@ pub enum DisputeStatus {
 
 /// Arbitrator's decision on the dispute.
 #[contracttype]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisputeOutcome {
     /// Full refund to the disputer (payer).
     RefundDisputer = 0,
@@ -537,6 +537,9 @@ impl DisputeContract {
 // =============================================================================
 // Tests
 // =============================================================================
+
+#[cfg(test)]
+mod test;
 
 #[cfg(test)]
 mod tests {

@@ -369,3 +369,41 @@ systemctl restart postgresql
 - [ ] Team is trained on restore procedures
 - [ ] Backup logs are monitored
 - [ ] Retention policies are enforced
+
+---
+
+## 11. Automated CI/CD Backups (GitHub Actions)
+
+Backups are fully automated via `.github/workflows/DB_BACKUPS.yml` (closes #797).
+
+### Schedule
+
+| Job | Cron | Description |
+|-----|------|-------------|
+| `backup` | `0 2 * * *` | Daily encrypted backup → S3 |
+| `restore-drill` | `0 3 * * 0` | Weekly restore-to-scratch integrity drill |
+
+Both jobs can also be triggered manually via `workflow_dispatch`.
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `deploy/backups/backup.sh` | `pg_dump` → gzip → GPG-encrypt → S3 upload → retention prune |
+| `deploy/backups/restore-drill.sh` | Decrypt → restore to temp DB → count tables → teardown |
+
+### Required GitHub Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `DB_PASSWORD` | PostgreSQL password |
+| `BACKUP_GPG_PASSPHRASE` | Symmetric GPG passphrase for encryption at rest |
+| `BACKUP_S3_BUCKET` | S3 bucket name (optional — artifact fallback used if unset) |
+| `AWS_ACCESS_KEY_ID` | AWS key (required if S3 bucket is set) |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret (required if S3 bucket is set) |
+| `AWS_REGION` | AWS region (default: `us-east-1`) |
+
+### Failure Alerting
+
+Both jobs automatically open a GitHub Issue labelled `devops, reliability` if they fail,
+ensuring on-call engineers are notified without requiring external tooling.

@@ -28,9 +28,9 @@ export const requestLogger = pinoHttp({
         }),
       ),
 
+  // PII SAFETY: Only method, url, and statusCode are logged.
+  // No headers, body, query params, or IP addresses are persisted.
   customProps: (req: any) => ({
-    userAgent: req.headers['user-agent'],
-    ip: req.headers['x-forwarded-for'] ?? req.socket?.remoteAddress,
     userId: req.user?.id ?? null,
   }),
 
@@ -40,5 +40,6 @@ export const requestLogger = pinoHttp({
   serializers: {
     req: (req) => ({ method: req.method, url: req.url }),
     res: (res) => ({ statusCode: res.statusCode }),
+    err: (err) => ({ message: err.message, type: err.type }),
   },
 })

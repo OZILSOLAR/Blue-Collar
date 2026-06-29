@@ -7,8 +7,10 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-soroban-sdk = { version = "21.5", features = ["alloc"] }
-soroban-contract = { version = "21.5" }
+soroban-sdk = { version = "26.1.0", features = ["alloc"] }
+
+[dev-dependencies]
+soroban-sdk = { version = "26.1.0", features = ["testutils"] }
 
 [profile.release]
 opt-level = "z"

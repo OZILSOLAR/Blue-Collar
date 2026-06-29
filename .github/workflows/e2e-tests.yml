@@ -48,10 +48,8 @@ jobs:
 
       - name: Start server (background)
         run: |
-          pnpm --filter "@bluecollar/app" start &
-          npx wait-on http://localhost:3001 --timeout 60000
-        env:
-          PORT: 3001
+          pnpm --filter "@bluecollar/app" start --port 3001 &
+          sleep 3
 
       - name: Run Playwright tests
         run: pnpm --filter "@bluecollar/app" test:e2e --project=${{ matrix.browser }}

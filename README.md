@@ -133,8 +133,16 @@ bluecollar/
 │   │   │       └── src/lib.rs
 │   │   └── Cargo.toml
 │   │
-│   └── app/                  # Next.js frontend
+│   ├── app/                  # Next.js frontend
+│   │   ├── src/
+│   │   └── package.json
+│   │
+│   └── mobile/               # React Native mobile app (Expo)
 │       ├── src/
+│       │   ├── auth/         # SecureStorage & BiometricAuth
+│       │   ├── screens/      # App screens
+│       │   └── context/      # React context providers
+│       ├── docs/
 │       └── package.json
 │
 ├── package.json              # Root workspace config
@@ -187,6 +195,26 @@ For complete function signatures, storage maps, event catalogues, and authorizat
 ### App (`packages/app`)
 
 Next.js 14 frontend. Connects to the BlueCollar API and integrates with Stellar wallets (Freighter) for on-chain interactions.
+
+---
+
+### Mobile (`packages/mobile`)
+
+React Native mobile app built with **Expo**. Features secure authentication with hardware-backed token storage and biometric unlock.
+
+**Key modules:**
+
+| Module | Purpose |
+|--------|---------|
+| `auth/SecureStorage.ts` | Hardware-backed token storage (Keychain/Keystore) |
+| `auth/BiometricAuth.ts` | Biometric authentication (Face ID, Touch ID, Fingerprint) |
+| `context/AuthContext.tsx` | Authentication state management |
+| `screens/BiometricSettingsScreen.tsx` | Biometric unlock settings |
+| `screens/AppLockScreen.tsx` | Biometric unlock prompt |
+
+**Tech stack:** React Native · Expo · expo-secure-store · expo-local-authentication
+
+**Documentation:** See [packages/mobile/docs/AUTHENTICATION.md](./packages/mobile/docs/AUTHENTICATION.md)
 
 ---
 

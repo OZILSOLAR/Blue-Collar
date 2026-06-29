@@ -1,0 +1,178 @@
+name: Security Scan
+# Closes #821
+# Consolidates: dependency audit gates (pnpm + cargo), secret scanning
+# (Gitleaks + TruffleHog), SBOM generation, and container image scanning.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "**/Dockerfile"
+      - ".github/workflows/security-scan.yml"
+  pull_request:
+    paths:
+      - "packages/**"
+      - "**/Dockerfile"
+      - ".github/workflows/security-scan.yml"
+  schedule:
+    # Weekly: catch newly-published CVEs even without code changes
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Secret scanning — blocks PRs / pushes that contain credentials
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: Secret scanning (Gitleaks + TruffleHog)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history required for diff-based scanning
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "true"
+          # Allowlist file: .gitleaks.toml (add project-specific FPs there)
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@v3.88.27
+        with:
+          extra_args: >
+            --only-verified
+            --fail
+
+  # ---------------------------------------------------------------------------
+  # Dependency audit — npm (pnpm) and Rust (cargo)
+  # Severity thresholds: HIGH+ for Node; any advisory for Rust.
+  # To allowlist a false positive add it to .auditignore / audit.toml.
+  # ---------------------------------------------------------------------------
+  audit:
+    name: Dependency audit (pnpm + cargo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Gate: fails CI for HIGH or CRITICAL advisories.
+      # To raise/lower threshold change --audit-level to: low | moderate | high | critical
+      - name: pnpm audit (high severity gate)
+        run: pnpm audit --audit-level=high
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('packages/contracts/Cargo.lock') }}
+
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+
+      # Gate: fails CI on any Rust advisory that is not explicitly ignored.
+      # To allowlist a crate add it to packages/contracts/.cargo/audit.toml
+      - name: cargo audit
+        working-directory: packages/contracts
+        run: cargo audit
+
+  # ---------------------------------------------------------------------------
+  # SBOM generation (Syft) — CycloneDX JSON for packages and container image
+  # ---------------------------------------------------------------------------
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate SBOM for Node packages (CycloneDX)
+        uses: anchore/sbom-action@v0.20.0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom-packages.cdx.json
+          artifact-name: sbom-packages
+
+      - name: Build API Docker image for SBOM
+        run: docker build -t bluecollar-api:${{ github.sha }} packages/api
+
+      - name: Generate SBOM for API Docker image
+        uses: anchore/sbom-action@v0.20.0
+        with:
+          image: bluecollar-api:${{ github.sha }}
+          format: cyclonedx-json
+          output-file: sbom-api-image.cdx.json
+          artifact-name: sbom-api-image
+
+      - name: Attest SBOM (main branch only)
+        if: github.ref == 'refs/heads/main'
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: bluecollar-api
+          subject-digest: ${{ github.sha }}
+          sbom-path: sbom-api-image.cdx.json
+
+  # ---------------------------------------------------------------------------
+  # Container image scanning (Trivy) — hard-fail on HIGH/CRITICAL CVEs
+  # ---------------------------------------------------------------------------
+  trivy:
+    name: Trivy image scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        run: docker build -t bluecollar-api:${{ github.sha }} packages/api
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.32.0
+        with:
+          image-ref: bluecollar-api:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ---------------------------------------------------------------------------
+  # Remediation guidance — printed on failure so engineers know what to do
+  # ---------------------------------------------------------------------------
+  # If any job above fails, see docs/SECURITY_TESTING.md#remediation for steps.

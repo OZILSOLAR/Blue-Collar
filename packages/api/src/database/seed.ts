@@ -54,12 +54,16 @@ const categories = [
   },
 ];
 
-// DEV ONLY — override via env vars in production
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@bluecollar.dev";
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Admin1234!";
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD;
 const CURATOR_EMAIL =
   process.env.SEED_CURATOR_EMAIL ?? "curator@bluecollar.dev";
-const CURATOR_PASSWORD = process.env.SEED_CURATOR_PASSWORD ?? "Curator1234!";
+const CURATOR_PASSWORD = process.env.SEED_CURATOR_PASSWORD;
+
+if (process.env.NODE_ENV === "production") {
+  if (!ADMIN_PASSWORD) throw new Error("SEED_ADMIN_PASSWORD is required in production");
+  if (!CURATOR_PASSWORD) throw new Error("SEED_CURATOR_PASSWORD is required in production");
+}
 
 async function seed() {
   const [adminHash, curatorHash] = await Promise.all([
