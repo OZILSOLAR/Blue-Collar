@@ -75,6 +75,7 @@ model User {
   messagesSent                Message[]
   initiatedConversations      Conversation[]           @relation("ConversationInitiator")
   stellarAccounts             StellarAccount[]
+  bookingRequests             Booking[]              @relation("BookingRequester")
 }
 
 model Category {
@@ -129,6 +130,8 @@ model Worker {
   jobApplications     JobApplication[]
   profileViews        ProfileView[]
   analytics           WorkerAnalytics?
+  tipEvents           WorkerTipEvent[]
+  bookings            Booking[]
 
   @@index([isActive, categoryId])
   @@index([curatorId])
@@ -456,6 +459,17 @@ model ProfileView {
   worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@index([workerId, ip, viewedAt])
+}
+
+model WorkerTipEvent {
+  id        String   @id @default(cuid())
+  workerId  String
+  amount    Float
+  txHash    String?
+  createdAt DateTime @default(now())
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId, createdAt])
 }
 
 model WorkerAnalytics {
@@ -840,6 +854,8 @@ enum BookingStatus {
   confirmed
   cancelled
   completed
+}
+
 // ─── Issue #749: Device & Session Management ─────────────────────────────────
 
 model Device {

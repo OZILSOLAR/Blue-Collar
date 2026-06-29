@@ -16,6 +16,7 @@ import type {
   PlatformAnalytics,
   ViewTrend,
   TopWorker,
+  WorkerPersonalDashboard,
 } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
@@ -166,6 +167,16 @@ export const getWorkerAnalytics = (workerId: string) =>
 
 export const getWorkerViewTrends = (workerId: string, days = 30) =>
   request<ApiResponse<ViewTrend[]>>(`/workers/${workerId}/analytics/trends?days=${days}`);
+
+export const getWorkerPersonalDashboard = (workerId: string, params?: { startDate?: string; endDate?: string; days?: number }) => {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()}` : "";
+  return request<ApiResponse<WorkerPersonalDashboard>>(`/workers/${workerId}/analytics/dashboard${qs}`);
+};
+
+export const exportWorkerPersonalAnalyticsCsv = (workerId: string, params?: { startDate?: string; endDate?: string; days?: number }) => {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()}` : "";
+  return `${BASE}/workers/${workerId}/analytics/export${qs}`;
+};
 
 export const getCuratorAnalytics = () =>
   request<ApiResponse<CuratorAnalytics>>("/analytics/curator");

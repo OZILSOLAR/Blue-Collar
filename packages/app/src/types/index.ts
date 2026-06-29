@@ -208,6 +208,43 @@ export interface ViewTrend {
   views: number;
 }
 
+export interface WorkerDashboardSeriesPoint {
+  date: string;
+  views: number;
+  uniqueViews: number;
+  tips: number;
+  tipCount: number;
+  avgRating: number | null;
+  reviewCount: number;
+  earnings: number;
+}
+
+export interface WorkerPersonalDashboard {
+  worker: { id: string; name: string; category: string; walletAddress?: string | null };
+  range: { startDate: string; endDate: string };
+  summary: {
+    totalViews: number;
+    uniqueViews: number;
+    tipsReceived: number;
+    tipCount: number;
+    avgRating: number;
+    reviewCount: number;
+    earnings: number;
+    contacts: number;
+  };
+  deltas: {
+    totalViews: number;
+    uniqueViews: number;
+    tipsReceived: number;
+    avgRating: number;
+    earnings: number;
+  };
+  charts: {
+    series: WorkerDashboardSeriesPoint[];
+    ratingDistribution: Array<{ rating: number; count: number }>;
+  };
+}
+
 export interface TopWorker {
   rank: number;
   workerId: string;
