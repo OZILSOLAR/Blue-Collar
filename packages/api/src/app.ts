@@ -3,6 +3,7 @@ import methodOverride from 'method-override'
 import passport from './config/passport.js'
 import { redis, cacheMetrics } from './config/redis.js'
 import { db } from './db.js'
+import { disconnectDb } from './db.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { registerEventHandlers } from './events/index.js'
 import { applySecurity, depthLimiter } from './middleware/security.js'
@@ -277,5 +278,22 @@ app.use(notFoundHandler)
 
 // Global error handler — must be last
 app.use(errorHandler)
+
+// ── Graceful shutdown (#836) ───────────────────────────────────────────────────
+// Drain in-flight requests and close both Prisma pool connections cleanly.
+// Kubernetes / PM2 send SIGTERM; Ctrl+C sends SIGINT.
+async function gracefulShutdown(signal: string): Promise<void> {
+  console.log(`[shutdown] ${signal} received — closing database connections…`)
+  try {
+    await disconnectDb()
+    console.log('[shutdown] Database connections closed.')
+  } catch (err) {
+    console.error('[shutdown] Error closing database connections:', err)
+  }
+  process.exit(0)
+}
+
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.once('SIGINT',  () => gracefulShutdown('SIGINT'))
 
 export default app

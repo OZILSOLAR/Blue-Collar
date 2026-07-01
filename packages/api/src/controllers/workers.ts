@@ -253,7 +253,7 @@ export async function updateWorker(req: Request<{ id: string }, {}, UpdateWorker
       const imgs = await processImage(req.file.path)
       imageFields = { imageThumb: imgs.thumb, imageMedium: imgs.medium, imageFull: imgs.full, avatar: imgs.full }
     }
-    const worker = await workerService.updateWorker(req.params.id, { ...req.body, ...imageFields })
+    const worker = await workerService.updateWorker(req.params.id, { ...req.body, ...imageFields }, req.user?.id)
     await invalidateCachePattern(`cache:*workers/${req.params.id}*`)
     await invalidateCachePattern(`cache:*workers?*`)
     return res.json({

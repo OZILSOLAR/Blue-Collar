@@ -92,6 +92,10 @@ model User {
   messagesSent                Message[]
   initiatedConversations      Conversation[]           @relation("ConversationInitiator")
   stellarAccounts             StellarAccount[]
+  /// Workers created by this user (audit trail — #833)
+  workersCreated              Worker[]             @relation("WorkerCreatedBy")
+  /// Workers last updated by this user (audit trail — #833)
+  workersUpdated              Worker[]             @relation("WorkerUpdatedBy")
 
   @@index([email])
   @@index([role])
@@ -140,6 +144,12 @@ model Worker {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   deletedAt           DateTime?
+  /// ID of the User who created this listing (audit trail — #833)
+  createdById         String?
+  createdBy           User?           @relation("WorkerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  /// ID of the User who last modified this listing (audit trail — #833)
+  updatedById         String?
+  updatedBy           User?           @relation("WorkerUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   bookmarks           Bookmark[]
   reviews             Review[]
   availability        Availability[]
@@ -160,6 +170,8 @@ model Worker {
   @@index([locationId])
   @@index([createdAt])
   @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
   // ── Covering indexes for common search/filter queries ──
   @@index([isActive, categoryId, createdAt])
   @@index([isActive, isVerified, categoryId])

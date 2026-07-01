@@ -59,13 +59,17 @@ export class WorkerRepository implements IWorkerRepository {
 
   async findAll(opts: { skip?: number; take?: number } = {}): Promise<Worker[]> {
     const query = QueryBuilder.pagination(opts)
-    return db.worker.findMany({ ...query, orderBy: QueryBuilder.defaultSort() })
+    return db.worker.findMany({
+      ...query,
+      where: { deletedAt: null },
+      orderBy: QueryBuilder.defaultSort(),
+    })
   }
 
   async findActive(opts: { skip?: number; take?: number } = {}): Promise<Worker[]> {
     const query = QueryBuilder.buildQuery({
       pagination: opts,
-      filter: { isActive: true },
+      filter: { isActive: true, deletedAt: null },
     })
     return db.worker.findMany({
       ...query,
@@ -75,7 +79,7 @@ export class WorkerRepository implements IWorkerRepository {
 
   async findByCurator(curatorId: string): Promise<Worker[]> {
     const query = QueryBuilder.buildQuery({
-      filter: { curatorId },
+      filter: { curatorId, deletedAt: null },
     })
     return db.worker.findMany({
       ...query,
@@ -102,8 +106,9 @@ export class WorkerRepository implements IWorkerRepository {
     return db.worker.update({ where: { id }, data, include: workerInclude })
   }
 
+  /** Soft-delete: sets deletedAt to now() instead of issuing a hard DELETE. */
   async delete(id: string): Promise<Worker> {
-    return db.worker.delete({ where: { id } })
+    return db.worker.update({ where: { id }, data: { deletedAt: new Date() } })
   }
 
   async count(where?: Prisma.WorkerWhereInput): Promise<number> {

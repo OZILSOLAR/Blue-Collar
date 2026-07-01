@@ -267,16 +267,23 @@ export async function getWorker(id: string) {
 
 export async function createWorker(data: CreateWorkerBody, curatorId: string) {
   logger.debug('Creating worker', { curatorId, name: data.name })
-  const worker = await db.worker.create({ data: { ...data, curatorId } as any, include: workerInclude })
+  const worker = await db.worker.create({
+    data: { ...data, curatorId, createdById: curatorId, updatedById: curatorId } as any,
+    include: workerInclude,
+  })
   publishEvent('worker.created', { worker: formatWorker(worker) }).catch(() => {})
   appEvents.emit('worker.created', { workerId: worker.id, curatorId })
   logger.info('Worker created successfully', { workerId: worker.id, curatorId })
   return formatWorker(worker)
 }
 
-export async function updateWorker(id: string, data: UpdateWorkerBody) {
+export async function updateWorker(id: string, data: UpdateWorkerBody, updatedById?: string) {
   logger.debug('Updating worker', { workerId: id })
-  const worker = await db.worker.update({ where: { id }, data: data as any, include: workerInclude })
+  const worker = await db.worker.update({
+    where: { id },
+    data: { ...data as any, ...(updatedById ? { updatedById } : {}) },
+    include: workerInclude,
+  })
   publishEvent('worker.updated', { worker: formatWorker(worker) }).catch(() => {})
   appEvents.emit('worker.updated', { workerId: id, curatorId: worker.curatorId })
   logger.info('Worker updated successfully', { workerId: id })
