@@ -257,3 +257,69 @@ export const sendJobMessage = (jobId: string, data: { recipientId: string; body:
 
 export const getJobMessages = (jobId: string) =>
   request<{ data: JobMessage[] }>(`/v1/jobs/${jobId}/messages`);
+
+// ── Notifications ───────────────────────────────────────────────────────────
+
+export const getNotifications = (params?: { page?: number; limit?: number }) => {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : "";
+  return request<ApiResponse<AppNotification[]> & { meta: Meta }>(`/v1/notifications${qs}`);
+};
+
+export const getUnreadNotificationCount = () =>
+  request<{ data: { count: number }; status: string; code: number }>("/v1/notifications/unread-count");
+
+export const markNotificationRead = (id: string) =>
+  request<ApiResponse<AppNotification>>(`/v1/notifications/${id}/read`, { method: "PATCH" });
+
+export const markAllNotificationsRead = () =>
+  request<{ data: { count: number }; status: string; code: number }>("/v1/notifications/read-all", { method: "PATCH" });
+
+export const deleteNotification = (id: string) =>
+  request<void>(`/v1/notifications/${id}`, { method: "DELETE" });
+
+// ── Conversations ───────────────────────────────────────────────────────────
+
+import type { Conversation, Message } from "@/types";
+
+export const getConversations = (params?: { page?: number; limit?: number }) => {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : "";
+  return request<ApiResponse<Conversation[]> & { meta: Meta }>(`/v1/conversations${qs}`);
+};
+
+export const startConversation = (data: { participantId: string; subject?: string; initialMessage: string }) =>
+  request<ApiResponse<Conversation>>("/v1/conversations", { method: "POST", body: data });
+
+export const getConversation = (id: string) =>
+  request<ApiResponse<Conversation>>(`/v1/conversations/${id}`);
+
+export const getConversationMessages = (id: string, params?: { page?: number; limit?: number }) => {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : "";
+  return request<ApiResponse<Message[]> & { meta: Meta }>(`/v1/conversations/${id}/messages${qs}`);
+};
+
+export const sendMessage = (conversationId: string, data: { body: string; attachmentUrl?: string; attachmentType?: string }) =>
+  request<ApiResponse<Message>>(`/v1/conversations/${conversationId}/messages`, { method: "POST", body: data });
+
+export const markConversationRead = (id: string) =>
+  request<{ status: string; code: number }>(`/v1/conversations/${id}/read`, { method: "PATCH" });
+
+// ── Review Helpful ──────────────────────────────────────────────────────────
+
+export const toggleReviewHelpful = (reviewId: string) =>
+  request<{ data: { helpful: boolean; count: number }; status: string; code: number }>(`/v1/reviews/${reviewId}/helpful`, { method: "POST" });
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+
+export const suspendUser = (userId: string) =>
+  request<ApiResponse<{ id: string; suspended: boolean }>>(`/v1/admin/users/${userId}/suspend`, { method: "PATCH" });
+
+export const unsuspendUser = (userId: string) =>
+  request<ApiResponse<{ id: string; suspended: boolean }>>(`/v1/admin/users/${userId}/unsuspend`, { method: "PATCH" });
+
+export const banUser = (userId: string) =>
+  request<ApiResponse<{ id: string; banned: boolean }>>(`/v1/admin/users/${userId}/ban`, { method: "PATCH" });
+
+export const getAuditLogs = (params?: Record<string, string>) => {
+  const qs = params ? `?${new URLSearchParams(params).toString()}` : "";
+  return request<{ data: AuditLogEntry[]; meta: Meta; status: string; code: number }>(`/v1/audit${qs}`);
+};

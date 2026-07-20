@@ -8,94 +8,80 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-
-export type NotificationType = "tip" | "review" | "contact" | "system";
-
-export interface AppNotification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
-  href?: string;
-}
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "@/lib/api";
+import type { AppNotification } from "@/types";
 
 interface NotificationContextValue {
   notifications: AppNotification[];
   unreadCount: number;
-  markRead: (id: string) => void;
-  markAllRead: () => void;
-  addNotification: (n: Omit<AppNotification, "id" | "read" | "createdAt">) => void;
-  clearAll: () => void;
+  loading: boolean;
+  markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
-const STORAGE_KEY = "bc_notifications";
-
-function load(): AppNotification[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function save(items: AppNotification[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [notifRes, countRes] = await Promise.all([
+        getNotifications({ limit: "50" }),
+        getUnreadNotificationCount(),
+      ]);
+      setNotifications(notifRes.data);
+      setUnreadCount(countRes.data.count);
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setNotifications(load());
+    refresh();
+  }, [refresh]);
+
+  const markRead = useCallback(async (id: string) => {
+    try {
+      await markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+      setUnreadCount((c) => Math.max(0, c - 1));
+    } catch {
+      // silently fail
+    }
   }, []);
 
-  const persist = useCallback((items: AppNotification[]) => {
-    setNotifications(items);
-    save(items);
+  const markAllRead = useCallback(async () => {
+    try {
+      const res = await markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadCount(res.data.count);
+    } catch {
+      // silently fail
+    }
   }, []);
-
-  const markRead = useCallback(
-    (id: string) =>
-      persist(
-        notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
-      ),
-    [notifications, persist]
-  );
-
-  const markAllRead = useCallback(
-    () => persist(notifications.map((n) => ({ ...n, read: true }))),
-    [notifications, persist]
-  );
-
-  const addNotification = useCallback(
-    (n: Omit<AppNotification, "id" | "read" | "createdAt">) => {
-      const next: AppNotification = {
-        ...n,
-        id: crypto.randomUUID(),
-        read: false,
-        createdAt: new Date().toISOString(),
-      };
-      persist([next, ...notifications]);
-    },
-    [notifications, persist]
-  );
-
-  const clearAll = useCallback(() => persist([]), [persist]);
 
   return (
     <NotificationContext.Provider
       value={{
         notifications,
-        unreadCount: notifications.filter((n) => !n.read).length,
+        unreadCount,
+        loading,
         markRead,
         markAllRead,
-        addNotification,
-        clearAll,
+        refresh,
       }}
     >
       {children}

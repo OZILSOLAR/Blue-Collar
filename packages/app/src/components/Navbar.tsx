@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Menu, Wallet, ChevronDown, User, Sun, Moon, Globe, X } from "lucide-react";
+import { Menu, Wallet, ChevronDown, User, Sun, Moon, Globe, X, MessageSquare } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -311,6 +311,10 @@ export default function Navbar() {
                   <Link href="/profile" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors">
                     <User size={16} className="text-gray-400" />
                     {t("profile")}
+                  </Link>
+                  <Link href="/messages" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors">
+                    <MessageSquare size={16} className="text-gray-400" />
+                    Messages
                   </Link>
                   {(user.role === "curator" || user.role === "admin") && (
                     <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm min-h-[48px] hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors">
