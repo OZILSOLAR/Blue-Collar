@@ -127,6 +127,7 @@ model Worker {
   jobApplications     JobApplication[]
   profileViews        ProfileView[]
   analytics           WorkerAnalytics?
+  bookings            Booking[]
 }
 
 model Bookmark {
