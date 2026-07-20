@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "BlueCollar - Decentralised protocol built on Stellar that connects local skilled workers with users through community-curated listings",
   "private": true,
+  "packageManager": "pnpm@10.32.1",
   "workspaces": [
     "packages/*"
   ],
