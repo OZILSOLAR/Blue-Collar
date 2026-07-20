@@ -1,0 +1,160 @@
+name: Preview Environments
+
+# Spin up an ephemeral Next.js preview for every PR on Vercel (or Cloudflare
+# Pages as fallback). Posts the URL as a PR comment and tears the deployment
+# down when the PR is closed/merged.
+# Closes #799
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "packages/app/**"
+      - "packages/api/**"
+      - ".github/workflows/preview.yml"
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Deploy preview (runs on open / update)
+  # ---------------------------------------------------------------------------
+  deploy-preview:
+    name: Deploy preview
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      preview_url: ${{ steps.deploy.outputs.preview_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm --filter @bluecollar/app build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.PREVIEW_API_URL || 'https://api-staging.bluecollar.app' }}
+          NEXT_PUBLIC_STELLAR_NETWORK: testnet
+          # Required by next-intl at build time
+          NODE_ENV: production
+
+      # -----------------------------------------------------------------------
+      # Vercel deployment (primary). Requires VERCEL_TOKEN, VERCEL_ORG_ID,
+      # VERCEL_PROJECT_ID to be set as repository secrets.
+      # -----------------------------------------------------------------------
+      - name: Deploy to Vercel
+        id: deploy
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: packages/app
+          alias-domains: pr-${{ github.event.pull_request.number }}.bluecollar.app
+
+      # -----------------------------------------------------------------------
+      # Fallback: upload build output as an artifact when Vercel is not
+      # configured (keeps the workflow green for all contributors).
+      # -----------------------------------------------------------------------
+      - name: Upload build artifact (no Vercel)
+        if: ${{ secrets.VERCEL_TOKEN == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-preview-pr${{ github.event.pull_request.number }}
+          path: packages/app/.next
+          retention-days: 7
+
+      - name: Set preview URL (artifact fallback)
+        if: ${{ secrets.VERCEL_TOKEN == '' }}
+        id: artifact_url
+        run: |
+          echo "preview_url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Post preview URL as a PR comment
+  # ---------------------------------------------------------------------------
+  comment:
+    name: Post preview URL
+    needs: deploy-preview
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Find existing preview comment
+        id: find_comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: "<!-- preview-env-comment -->"
+
+      - name: Create or update preview comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            <!-- preview-env-comment -->
+            ## 🔍 Preview Environment
+
+            | | |
+            |---|---|
+            | **Preview URL** | ${{ needs.deploy-preview.outputs.preview_url }} |
+            | **PR** | #${{ github.event.pull_request.number }} |
+            | **Commit** | ${{ github.sha }} |
+            | **Status** | ✅ Deployed |
+
+            > Preview uses the staging API stub (`NEXT_PUBLIC_STELLAR_NETWORK=testnet`).
+            > Tear-down happens automatically when this PR is closed.
+
+  # ---------------------------------------------------------------------------
+  # Tear down on PR close / merge
+  # ---------------------------------------------------------------------------
+  teardown:
+    name: Teardown preview
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Delete Vercel deployment alias
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        run: |
+          curl -s -X DELETE \
+            "https://api.vercel.com/v2/aliases/pr-${{ github.event.pull_request.number }}.bluecollar.app" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" || true
+
+      - name: Update PR comment — torn down
+        uses: peter-evans/find-comment@v3
+        id: find_comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: "<!-- preview-env-comment -->"
+
+      - name: Mark as torn down
+        if: steps.find_comment.outputs.comment-id != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          edit-mode: replace
+          body: |
+            <!-- preview-env-comment -->
+            ## 🔍 Preview Environment
+
+            | | |
+            |---|---|
+            | **PR** | #${{ github.event.pull_request.number }} |
+            | **Status** | 🗑️ Torn down (PR closed) |

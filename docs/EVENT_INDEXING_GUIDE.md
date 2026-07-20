@@ -2,392 +2,264 @@
 
 ## Overview
 
-This guide documents all events emitted by BlueCollar smart contracts for efficient off-chain indexing. Events are optimized with indexed parameters to enable fast filtering and querying.
+All BlueCollar contracts emit Soroban events on every state change. This document
+is the canonical reference for indexer consumers. The schema is versioned — see
+the `VERSION` constant (`pub const VERSION: u32 = 1`) exported by every contract.
 
 ## Event Structure
 
-All events follow the Soroban event format:
 ```
-env.events().publish((event_name, indexed_param1, indexed_param2, ...), data_payload)
+env.events().publish((topic1, topic2?, ...), data_payload)
 ```
 
-- **Event name**: Short symbol (max 7 characters) for efficient encoding
-- **Indexed parameters**: Searchable fields (typically addresses, symbols, IDs)
-- **Data payload**: Additional context (amounts, timestamps, status)
+- **Topics**: Searchable indexed fields. The first topic is always the event name
+  (a `Symbol` of ≤ 9 characters). Subsequent topics are addresses, ids, or symbols.
+- **Data**: Non-indexed context (amounts, timestamps, flags).
+
+## Schema Version
+
+| Contract        | `VERSION` | Changed in |
+|-----------------|-----------|------------|
+| Registry        | 1         | initial    |
+| Market          | 1         | initial    |
+| Dispute         | 1         | initial    |
+| FeeDistribution | —         | —          |
+| InsurancePool   | —         | —          |
+
+Call `<contract>.version()` on-chain to confirm the version a deployment reports.
+
+---
 
 ## Registry Contract Events
 
 ### Role Management
 
-#### RlGrnt (Role Granted)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-- **Emitted by**: `grant_role()`
-- **Use case**: Track role assignments for access control audits
+| Symbol  | Topics (after name)          | Data     | Function        |
+|---------|------------------------------|----------|-----------------|
+| `RlGrnt`| `role: Symbol, account: Address` | —    | `grant_role`    |
+| `RlRvkd`| `role: Symbol, account: Address` | —    | `revoke_role`   |
 
-#### RlRvkd (Role Revoked)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-- **Emitted by**: `revoke_role()`
-- **Use case**: Track role removals for security monitoring
+### Delegation
 
-### Delegation Management
-
-#### DlgAdd (Delegate Added)
-- **Indexed**: `worker_id` (Symbol), `delegate` (Address)
-- **Data**: `expires_at` (u64)
-- **Emitted by**: `add_delegate()`
-- **Use case**: Track worker profile delegation grants
-
-#### DlgRem (Delegate Removed)
-- **Indexed**: `worker_id` (Symbol), `delegate` (Address)
-- **Data**: None
-- **Emitted by**: `remove_delegate()`
-- **Use case**: Track delegation revocations
+| Symbol  | Topics                              | Data             | Function          |
+|---------|-------------------------------------|------------------|-------------------|
+| `DlgAdd`| `worker_id: Symbol, delegate: Address` | `expires_at: u64` | `add_delegate` |
+| `DlgRem`| `worker_id: Symbol, delegate: Address` | —              | `remove_delegate` |
 
 ### Contract State
 
-#### Paused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-- **Emitted by**: `pause()`
-- **Use case**: Monitor contract pause events
-
-#### Unpaused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-- **Emitted by**: `unpause()`
-- **Use case**: Monitor contract resume events
+| Symbol    | Topics              | Data | Function  |
+|-----------|---------------------|------|-----------|
+| `Paused`  | `admin: Address`    | —    | `pause`   |
+| `Unpaused`| `admin: Address`    | —    | `unpause` |
 
 ### Curator Management
 
-#### CurAdd (Curator Added)
-- **Indexed**: `admin` (Address), `curator` (Address)
-- **Data**: None
-- **Emitted by**: `add_curator()`
-- **Use case**: Track curator onboarding
-
-#### CurRem (Curator Removed)
-- **Indexed**: `admin` (Address), `curator` (Address)
-- **Data**: None
-- **Emitted by**: `remove_curator()`
-- **Use case**: Track curator offboarding
+| Symbol  | Topics                             | Data | Function        |
+|---------|------------------------------------|------|-----------------|
+| `CurAdd`| `admin: Address, curator: Address` | —    | `add_curator`   |
+| `CurRem`| `admin: Address, curator: Address` | —    | `remove_curator`|
 
 ### Worker Registration
 
-#### WrkReg (Worker Registered)
-- **Indexed**: `worker_id` (Symbol)
-- **Data**: `(owner: Address, category: Symbol)`
-- **Emitted by**: `register()`, `batch_register()`
-- **Use case**: Index new worker listings by ID, owner, and category
-
-#### WrkTgl (Worker Toggled)
-- **Indexed**: `worker_id` (Symbol)
-- **Data**: `is_active` (bool)
-- **Emitted by**: `toggle()`
-- **Use case**: Track worker availability status changes
-
-#### WrkUpd (Worker Updated)
-- **Indexed**: `worker_id` (Symbol)
-- **Data**: `(name: String, category: Symbol)` or `(name: String, category: Symbol, wallet: Address)`
-- **Emitted by**: `update()`, `update_worker()`
-- **Use case**: Index worker profile updates
-
-#### WrkDrg (Worker Deregistered)
-- **Indexed**: `worker_id` (Symbol), `caller` (Address)
-- **Data**: None
-- **Emitted by**: `deregister()`
-- **Use case**: Track worker removal from registry
+| Symbol   | Topics                    | Data                            | Function                      |
+|----------|---------------------------|---------------------------------|-------------------------------|
+| `WrkReg` | `worker_id: Symbol`       | `(owner: Address, category: Symbol)` | `register`, `batch_register` |
+| `WrkTgl` | `worker_id: Symbol`       | `is_active: bool`               | `toggle`, `batch_toggle`      |
+| `WrkUpd` | `worker_id: Symbol`       | `(name: String, category: Symbol)` | `update`, `update_worker`  |
+| `WrkDrg` | `worker_id: Symbol, caller: Address` | —                  | `deregister`                  |
 
 ### Reputation
 
-#### RepUpd (Reputation Updated)
-- **Indexed**: `worker_id` (Symbol)
-- **Data**: `score` (u32)
-- **Emitted by**: `update_reputation()`
-- **Use case**: Index reputation score changes
+| Symbol     | Topics                  | Data                               | Function              |
+|------------|-------------------------|------------------------------------|-----------------------|
+| `RepUpd`   | `worker_id: Symbol`     | `score: u32`                       | `update_reputation`   |
+| `RepSlash` | `worker_id: Symbol`     | `(slash_bps: u32, new_rep: u32)`   | `slash_reputation`    |
+| `RepSlashed`| `worker_id: Symbol`    | `(avg_rating: u32, new_rep: u32)`  | `submit_review` (auto-slash) |
+| `RevSub`   | `worker_id: Symbol`     | `(reviewer: Address, rating: u32, new_rep: u32)` | `submit_review` |
+| `JobComp`  | `worker_id: Symbol`     | `(tip_count: u32, new_rep: u32)`   | `record_job_completion` |
 
-### Category Verification
+### Category & Location
 
-#### CatVfy (Category Verified)
-- **Indexed**: `worker_id` (Symbol), `category` (Symbol)
-- **Data**: `(curator: Address, expires_at: u64)`
-- **Emitted by**: `verify_category()`
-- **Use case**: Track category verification records
+| Symbol  | Topics                                    | Data                        | Function           |
+|---------|-------------------------------------------|-----------------------------|--------------------|
+| `CatVfy`| `worker_id: Symbol, category: Symbol`     | `(curator: Address, expires_at: u64)` | `verify_category` |
+| `LocVfy`| `worker_id: Symbol`                       | `(verifier: Address, verified_at: u64, expires_at: u64)` | `verify_location` |
+| `CatAdded`| `name: Symbol`                          | —                           | `add_category`     |
+| `CatRemoved`| `name: Symbol`                        | —                           | `remove_category`  |
+
+### Availability & Subscription
+
+| Symbol  | Topics              | Data                                        | Function               |
+|---------|---------------------|---------------------------------------------|------------------------|
+| `AvlUpd`| `worker_id: Symbol` | `(is_available: bool, updated_at: u64, expires_at: u64)` | `update_availability` |
+| `SubUpd`| `worker_id: Symbol` | `(tier: u32, expires_at: u64)`              | `update_subscription`  |
+| `SubRnw`| `worker_id: Symbol` | `new_expires_at: u64`                       | `renew_subscription`   |
 
 ### Staking
 
-#### Staked
-- **Indexed**: `worker_id` (Symbol), `caller` (Address)
-- **Data**: `(amount: i128, total_staked: i128)`
-- **Emitted by**: `stake()`
-- **Use case**: Track staking activity and total staked amounts
+| Symbol     | Topics                           | Data                          | Function         |
+|------------|----------------------------------|-------------------------------|------------------|
+| `Staked`   | `worker_id: Symbol, caller: Address` | `(amount: i128, total: i128)` | `stake`       |
+| `UnstakeRq`| `worker_id: Symbol, caller: Address` | `requested_at: u64`       | `request_unstake`|
+| `Unstaked` | `worker_id: Symbol, caller: Address` | `(staked: i128, rewards: i128)` | `unstake`  |
 
-#### UnstakeRq (Unstake Requested)
-- **Indexed**: `worker_id` (Symbol), `caller` (Address)
-- **Data**: `unstake_requested_at` (u64)
-- **Emitted by**: `request_unstake()`
-- **Use case**: Track unstake request initiation
+### Badges
 
-#### Unstaked
-- **Indexed**: `worker_id` (Symbol), `caller` (Address)
-- **Data**: `(staked: i128, rewards: i128)`
-- **Emitted by**: `unstake()`
-- **Use case**: Track unstake completion and reward distribution
+| Symbol  | Topics                                    | Data                    | Function      |
+|---------|-------------------------------------------|-------------------------|---------------|
+| `BdgAwd`| `worker_id: Symbol, badge_id: Symbol`     | `(issuer: Address, name: String)` | `award_badge` |
+| `BdgRvk`| `worker_id: Symbol, badge_id: Symbol`     | `caller: Address`       | `revoke_badge`|
+
+### Schema & Upgrade
+
+| Symbol     | Topics                       | Data                          | Function         |
+|------------|------------------------------|-------------------------------|------------------|
+| `Migrated` | —                            | `(from_ver: u32, to_ver: u32)`| `migrate`        |
+| `UpgPropsd`| `execute_after_ledger: u32`  | —                             | `propose_upgrade`|
+| `UpgExecd` | —                            | —                             | `execute_upgrade`|
+| `UpgCancld`| —                            | —                             | `cancel_upgrade` |
+
+---
 
 ## Market Contract Events
 
 ### Role Management
 
-#### RlGrnt (Role Granted)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-- **Emitted by**: `grant_role()`
-
-#### RlRvkd (Role Revoked)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-- **Emitted by**: `revoke_role()`
+| Symbol  | Topics                             | Data | Function      |
+|---------|------------------------------------|------|---------------|
+| `RlGrnt`| `role: Symbol, account: Address`   | —    | `grant_role`  |
+| `RlRvkd`| `role: Symbol, account: Address`   | —    | `revoke_role` |
 
 ### Contract State
 
-#### Paused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-- **Emitted by**: `pause()`
+| Symbol    | Topics           | Data | Function  |
+|-----------|------------------|------|-----------|
+| `Paused`  | `admin: Address` | —    | `pause`   |
+| `Unpaused`| `admin: Address` | —    | `unpause` |
 
-#### Unpaused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-- **Emitted by**: `unpause()`
+### Config
+
+| Symbol  | Topics            | Data               | Function       |
+|---------|-------------------|--------------------|----------------|
+| `TrsSet`| `caller: Address` | `new_treasury: Address` | `set_treasury` |
 
 ### Payments
 
-#### Tip
-- **Indexed**: `from` (Address), `to` (Address)
-- **Data**: `(token: Address, amount: i128, fee: i128)`
-- **Emitted by**: `tip()`
-- **Use case**: Track direct tip transfers
+| Symbol    | Topics                        | Data                          | Function |
+|-----------|-------------------------------|-------------------------------|----------|
+| `TipSent` | `from: Address, to: Address`  | `(token: Address, amount: i128)` | `tip` |
+| `FeeTaken`| —                             | `(fee: i128, recipient: Address)` | `tip`, `release_escrow` |
 
 ### Escrow
 
-#### EscrowCreated
-- **Indexed**: `id` (Symbol), `from` (Address), `to` (Address)
-- **Data**: `(token: Address, amount: i128, expiry: u64)`
-- **Emitted by**: `create_escrow()`
-- **Use case**: Track escrow creation
-
-#### EscrowReleased
-- **Indexed**: `id` (Symbol), `to` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `release_escrow()`
-- **Use case**: Track escrow fund releases
-
-#### EscrowCancelled
-- **Indexed**: `id` (Symbol), `from` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `cancel_escrow()`
-- **Use case**: Track escrow cancellations
+| Symbol  | Topics                         | Data                                    | Function               |
+|---------|--------------------------------|-----------------------------------------|------------------------|
+| `EscCrt`| `id: Symbol, from: Address`    | `(to: Address, token: Address, amount: i128, expiry: u64)` | `create_escrow` |
+| `EscRel`| `id: Symbol, to: Address`      | `amount: i128`                          | `release_escrow`, `batch_release_escrow` |
+| `EscCnl`| `id: Symbol, from: Address`    | `amount: i128`                          | `cancel_escrow`        |
+| `EscExp`| `id: Symbol, from: Address`    | `amount: i128`                          | `cancel_expired_escrow`|
 
 ### Multi-Signature Escrow
 
-#### MultiSigCreated
-- **Indexed**: `id` (Symbol), `from` (Address), `to` (Address)
-- **Data**: `(token: Address, amount: i128, threshold: u32)`
-- **Emitted by**: `create_multisig_escrow()`
-- **Use case**: Track multi-sig escrow creation
+| Symbol    | Topics                        | Data                          | Function                     |
+|-----------|-------------------------------|-------------------------------|------------------------------|
+| `MsEscCrt`| `id: Symbol, from: Address`   | `(to: Address, amount: i128, threshold: u32)` | `create_multisig_escrow` |
+| `MsEscApv`| `id: Symbol, caller: Address` | `approvals_count: u32`        | `approve_multisig_release`   |
+| `MsEscRel`| `id: Symbol, to: Address`     | `amount: i128`                | `approve_multisig_release` (threshold reached) |
+| `MsEscCnl`| `id: Symbol, from: Address`   | `amount: i128`                | `cancel_multisig_escrow`     |
 
-#### MultiSigApproved
-- **Indexed**: `id` (Symbol), `signer` (Address)
-- **Data**: `approvals_count` (u32)
-- **Emitted by**: `approve_multisig_release()`
-- **Use case**: Track approval progress
+### Arbitration
 
-#### MultiSigReleased
-- **Indexed**: `id` (Symbol), `to` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `approve_multisig_release()` (when threshold reached)
-- **Use case**: Track multi-sig fund releases
+| Symbol    | Topics                          | Data                    | Function                        |
+|-----------|---------------------------------|-------------------------|---------------------------------|
+| `ArbAdd`  | `admin: Address, arb: Address`  | —                       | `add_arbitrator`                |
+| `ArbRem`  | `admin: Address, arb: Address`  | —                       | `remove_arbitrator`             |
+| `ArbReq`  | `escrow_id: Symbol, caller: Address` | `(arbitrator: Address, fee: i128)` | `request_arbitration` |
+| `ArbRes`  | `escrow_id: Symbol, arbitrator: Address` | `release_to_worker: bool` | `resolve_arbitration` |
+| `MsArbReq`| `escrow_id: Symbol, caller: Address` | `(arbitrator: Address, fee: i128)` | `request_multisig_arbitration` |
+| `MsArbRes`| `escrow_id: Symbol, arbitrator: Address` | `release_to_worker: bool` | `resolve_multisig_arbitration` |
+
+---
+
+## Dispute Contract Events
+
+| Symbol     | Topics                              | Data                              | Function          |
+|------------|-------------------------------------|-----------------------------------|-------------------|
+| `Init`     | —                                   | `admin: Address`                  | `initialize`      |
+| `Paused`   | `admin: Address`                    | —                                 | `pause`           |
+| `Unpaused` | `admin: Address`                    | —                                 | `unpause`         |
+| `ArbAdd`   | —                                   | `arbitrator: Address`             | `add_arbitrator`  |
+| `ArbRem`   | —                                   | `arbitrator: Address`             | `remove_arbitrator` |
+| `DspOpen`  | `id: Symbol, disputer: Address`     | `(respondent: Address, amount: i128)` | `file_dispute` |
+| `DspEvid`  | `id: Symbol, caller: Address`       | —                                 | `submit_evidence` |
+| `DspDcide` | `id: Symbol, arbitrator: Address`   | `(outcome: u32, split_bps: u32)`  | `decide`          |
+| `DspSettle`| `id: Symbol`                        | `(outcome: u32, amount: i128)`    | `settle`          |
+
+### Dispute Outcome Values
+
+| `outcome` u32 | Meaning                          |
+|---------------|----------------------------------|
+| `0`           | `RefundDisputer` — full refund   |
+| `1`           | `ReleaseRespondent` — full release |
+| `2`           | `Split` — split per `split_bps`  |
+
+---
 
 ## Fee Distribution Contract Events
 
-### Role Management
+| Symbol    | Topics                               | Data             | Function             |
+|-----------|--------------------------------------|------------------|----------------------|
+| `RlGrnt`  | `role: Symbol, account: Address`     | —                | `grant_role`         |
+| `RlRvkd`  | `role: Symbol, account: Address`     | —                | `revoke_role`        |
+| `Paused`  | `caller: Address`                    | —                | `pause`              |
+| `Unpaused`| `caller: Address`                    | —                | `unpause`            |
+| `FeeRcp`  | `recipient_count: u32`               | —                | `set_fee_recipients` |
+| `FeeColl` | `token: Address`                     | `amount: i128`   | `collect_fees`       |
+| `FeeDistr`| `recipient: Address`                 | `amount: i128`   | `distribute_fees`    |
+| `FeeWdraw`| `token: Address`                     | `amount: i128`   | `withdraw_fees`      |
 
-#### RlGrnt (Role Granted)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-
-#### RlRvkd (Role Revoked)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-
-### Contract State
-
-#### Paused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-
-#### Unpaused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-
-### Fee Management
-
-#### FeeRcp (Fee Recipients Set)
-- **Indexed**: None
-- **Data**: `recipient_count` (u32)
-- **Emitted by**: `set_fee_recipients()`
-- **Use case**: Track fee recipient configuration changes
-
-#### FeeColl (Fee Collected)
-- **Indexed**: `token` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `collect_fees()`
-- **Use case**: Track fee collection by token
-
-#### FeeDistr (Fee Distributed)
-- **Indexed**: `recipient` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `distribute_fees()`
-- **Use case**: Track individual fee distributions
-
-#### FeeWdraw (Fee Withdrawn)
-- **Indexed**: `token` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `withdraw_fees()`
-- **Use case**: Track emergency fee withdrawals
-
-## Insurance Pool Contract Events
-
-### Role Management
-
-#### RlGrnt (Role Granted)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-
-#### RlRvkd (Role Revoked)
-- **Indexed**: `role` (Symbol), `account` (Address)
-- **Data**: None
-
-### Contract State
-
-#### Paused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-
-#### Unpaused
-- **Indexed**: `admin` (Address)
-- **Data**: None
-
-### Pool Management
-
-#### Contrib (Contribution)
-- **Indexed**: `contributor` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `contribute()`
-- **Use case**: Track pool contributions
-
-#### Rebal (Pool Rebalanced)
-- **Indexed**: `token` (Address)
-- **Data**: `new_premium_bps` (i128)
-- **Emitted by**: `rebalance_pool()`
-- **Use case**: Track premium adjustments
-
-### Claims
-
-#### ClmFile (Claim Filed)
-- **Indexed**: `claimant` (Address)
-- **Data**: `amount` (i128)
-- **Emitted by**: `file_claim()`
-- **Use case**: Track new claims
-
-#### ClmAppr (Claim Approved)
-- **Indexed**: `claim_id` (Symbol)
-- **Data**: `amount` (i128)
-- **Emitted by**: `approve_claim()`
-- **Use case**: Track claim approvals
-
-#### ClmRej (Claim Rejected)
-- **Indexed**: `claim_id` (Symbol)
-- **Data**: `amount` (i128)
-- **Emitted by**: `reject_claim()`
-- **Use case**: Track claim rejections
-
-#### ClmPay (Claim Paid)
-- **Indexed**: `claim_id` (Symbol)
-- **Data**: `amount` (i128)
-- **Emitted by**: `pay_claim()`
-- **Use case**: Track claim payouts
+---
 
 ## Indexing Best Practices
 
-### 1. Event Filtering
-
-Use indexed parameters to efficiently filter events:
+### Filter by event name and indexed fields
 
 ```javascript
-// Filter all workers registered by a specific curator
-registry.events()
-  .filter(e => e.name === 'WrkReg' && e.indexed[0] === curator_address)
-  .map(e => ({ worker_id: e.indexed[0], owner: e.data[0], category: e.data[1] }))
+// All workers registered in category "plumber"
+events
+  .filter(e => e.topics[0] === 'WrkReg')
+  .filter(e => e.data[1] === 'plumber')
 ```
 
-### 2. Time-Series Analysis
-
-Combine events with ledger timestamps for analytics:
+### Reconstruct dispute state
 
 ```javascript
-// Track worker registration trends
-const registrations = events
-  .filter(e => e.name === 'WrkReg')
-  .map(e => ({ timestamp: e.ledger_timestamp, worker_id: e.indexed[0] }))
-  .sort((a, b) => a.timestamp - b.timestamp)
+const phases = ['Open', 'Evidence', 'Decided', 'Settled'];
+events
+  .filter(e => e.topics[1] === dispute_id)
+  .reduce((state, e) => {
+    if (e.topics[0] === 'DspOpen')   state.phase = 'Open';
+    if (e.topics[0] === 'DspEvid')   state.phase = 'Evidence';
+    if (e.topics[0] === 'DspDcide')  state.phase = 'Decided';
+    if (e.topics[0] === 'DspSettle') state.phase = 'Settled';
+    return state;
+  }, {});
 ```
 
-### 3. State Reconstruction
-
-Use events to reconstruct contract state:
+### Track fee revenue
 
 ```javascript
-// Rebuild worker profile from events
-const worker_events = events.filter(e => e.indexed[0] === worker_id)
-const profile = {
-  registered: worker_events.find(e => e.name === 'WrkReg'),
-  updates: worker_events.filter(e => e.name === 'WrkUpd'),
-  reputation: worker_events.filter(e => e.name === 'RepUpd').pop(),
-  active: worker_events.filter(e => e.name === 'WrkTgl').pop()?.data
-}
+events
+  .filter(e => e.topics[0] === 'FeeTaken')
+  .reduce((total, e) => total + e.data[0], 0n) // sum fees
 ```
 
-### 4. Audit Trails
+## Schema Change Policy
 
-Track sensitive operations:
-
-```javascript
-// Audit all role changes
-const role_changes = events.filter(e => e.name === 'RlGrnt' || e.name === 'RlRvkd')
-  .map(e => ({
-    action: e.name === 'RlGrnt' ? 'granted' : 'revoked',
-    role: e.indexed[0],
-    account: e.indexed[1],
-    timestamp: e.ledger_timestamp
-  }))
-```
-
-## Event Completeness Checklist
-
-- [x] All state-mutating functions emit events
-- [x] Events include all relevant indexed parameters
-- [x] Event names are concise (≤7 characters)
-- [x] Data payloads include context not in indexed params
-- [x] Events enable full state reconstruction
-- [x] Events support audit trail requirements
-- [x] Events are documented with use cases
-
-## Storage Considerations
-
-- Events are not stored on-chain; they're emitted to the Stellar network
-- Indexers must subscribe to contract events to capture them
-- Event data is immutable once emitted
-- Use indexed parameters for frequently-queried fields
-- Keep data payloads minimal to reduce network overhead
+1. Bump `VERSION` in the contract source whenever an event is added, removed, or
+   its topics/data shape changes.
+2. Update this document in the same PR.
+3. Old event names must not be reused for different semantics.
+4. Additive changes (new events) are non-breaking; structural changes require
+   a major version bump and a migration path for indexers.

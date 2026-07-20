@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import * as workerService from '../services/worker.service.js'
+import { searchWorkers } from '../services/search.service.js'
 import { handleError } from '../utils/handleError.js'
 import { db } from '../db.js'
 import { WorkerResource, WorkerCollection } from '../resources/index.js'
@@ -20,14 +21,33 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+// Parse a comma-separated ?fields= query param into a set for O(1) lookup.
+// An empty/absent param means "return all fields".
+function parseFields(raw: unknown): Set<string> | null {
+  if (!raw) return null
+  const fields = String(raw).split(',').map(f => f.trim()).filter(Boolean)
+  return fields.length > 0 ? new Set(fields) : null
+}
+
+// Apply a sparse fieldset to an object, keeping only the requested keys.
+function sparseFields(
+  obj: Record<string, unknown>,
+  fields: Set<string> | null,
+): Record<string, unknown> {
+  if (!fields) return obj
+  return Object.fromEntries([...fields].filter(f => f in obj).map(f => [f, obj[f]]))
+}
+
 export async function listWorkers(req: Request, res: Response) {
   const {
     category, page, cursor, limit = '20', lat, lng, radius,
     search, lang, city, state, country,
     minRating, maxRating, available, listedSince,
     categories, sortBy, sortOrder, isVerified,
+    fields: fieldsParam,
   } = req.query
   const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 100)
+  const fieldSet = parseFields(fieldsParam)
 
   if (!page && !lat && !lng) {
     const categoryIds = categories
@@ -78,9 +98,12 @@ export async function listWorkers(req: Request, res: Response) {
       orderBy: { createdAt: 'desc' },
     })
     const data = rows.slice(0, limitNum)
+    const collection = WorkerCollection(data as any).map(
+      w => sparseFields(w as Record<string, unknown>, fieldSet),
+    )
 
     return res.json({
-      data: WorkerCollection(data as any),
+      data: collection,
       nextCursor: rows.length > limitNum ? data[data.length - 1]?.id ?? null : null,
       limit: limitNum,
       status: 'success',
@@ -119,7 +142,10 @@ export async function listWorkers(req: Request, res: Response) {
 
     const pageNum = Number(page)
     const paginated = withDistance.slice((pageNum - 1) * limitNum, pageNum * limitNum)
-    return res.json({ data: paginated, status: 'success', code: 200 })
+    const geoData = fieldSet
+      ? paginated.map(w => sparseFields(w as Record<string, unknown>, fieldSet))
+      : paginated
+    return res.json({ data: geoData, status: 'success', code: 200 })
   }
 
   // Parse multi-category: ?categories=id1,id2,id3
@@ -146,7 +172,10 @@ export async function listWorkers(req: Request, res: Response) {
     isVerified: isVerified !== undefined ? isVerified === 'true' : undefined,
   })
 
-  return res.json({ ...result, status: 'success', code: 200 })
+  const resultData = fieldSet && Array.isArray((result as any).data)
+    ? { ...result, data: (result as any).data.map((w: Record<string, unknown>) => sparseFields(w, fieldSet)) }
+    : result
+  return res.json({ ...resultData, status: 'success', code: 200 })
 }
 
 /**
@@ -224,7 +253,7 @@ export async function updateWorker(req: Request<{ id: string }, {}, UpdateWorker
       const imgs = await processImage(req.file.path)
       imageFields = { imageThumb: imgs.thumb, imageMedium: imgs.medium, imageFull: imgs.full, avatar: imgs.full }
     }
-    const worker = await workerService.updateWorker(req.params.id, { ...req.body, ...imageFields })
+    const worker = await workerService.updateWorker(req.params.id, { ...req.body, ...imageFields }, req.user?.id)
     await invalidateCachePattern(`cache:*workers/${req.params.id}*`)
     await invalidateCachePattern(`cache:*workers?*`)
     return res.json({
@@ -306,6 +335,42 @@ export async function listMyWorkers(req: Request, res: Response) {
     status: 'success',
     code: 200,
   })
+}
+
+/**
+ * GET /api/workers/search
+ * Full-text worker search with ranked results, geo radius, rating, and availability filters.
+ * Issue #747
+ */
+export async function searchWorkersHandler(req: Request, res: Response) {
+  try {
+    const {
+      q, query, lang, lat, lng, radius,
+      categories, minRating, maxRating,
+      dayOfWeek, isVerified, sortBy,
+      page = '1', limit = '20',
+    } = req.query
+
+    const result = await searchWorkers({
+      query: (q || query) ? String(q ?? query) : undefined,
+      lang: lang ? String(lang) : undefined,
+      lat: lat ? Number(lat) : undefined,
+      lng: lng ? Number(lng) : undefined,
+      radius: radius ? Number(radius) : undefined,
+      categories: categories ? String(categories).split(',').map(c => c.trim()).filter(Boolean) : undefined,
+      minRating: minRating ? Number(minRating) : undefined,
+      maxRating: maxRating ? Number(maxRating) : undefined,
+      dayOfWeek: dayOfWeek !== undefined ? Number(dayOfWeek) : undefined,
+      isVerified: isVerified !== undefined ? isVerified === 'true' : undefined,
+      sortBy: sortBy as any,
+      page: Number(page),
+      limit: Math.min(Math.max(Number(limit) || 20, 1), 100),
+    }, req.ip)
+
+    return res.json({ ...result, status: 'success', code: 200 })
+  } catch (error) {
+    return handleError(res, error)
+  }
 }
 
 /**

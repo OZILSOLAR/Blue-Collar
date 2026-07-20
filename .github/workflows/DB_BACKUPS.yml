@@ -1,0 +1,172 @@
+name: DB Backups
+
+# Scheduled encrypted database backups with off-site upload and restore drills.
+# Closes #797
+on:
+  schedule:
+    # Daily backup at 02:00 UTC
+    - cron: "0 2 * * *"
+    # Weekly restore drill on Sunday at 03:00 UTC
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Run 'backup' or 'restore-drill'"
+        required: true
+        default: backup
+        type: choice
+        options: [backup, restore-drill]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Scheduled encrypted backup → S3
+  # ---------------------------------------------------------------------------
+  backup:
+    name: Backup
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'backup' ||
+      github.event_name == 'schedule' && github.event.schedule == '0 2 * * *'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bluecollar
+          POSTGRES_USER: bluecollar
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        options: >-
+          --health-cmd "pg_isready -U bluecollar"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: bluecollar
+      DB_USER: bluecollar
+      PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+      BACKUP_DIR: /tmp/backups
+      RETENTION_DAYS: "30"
+      GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+      S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y postgresql-client gpg
+
+      - name: Configure AWS credentials
+        if: env.S3_BUCKET != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Make script executable
+        run: chmod +x deploy/backups/backup.sh
+
+      - name: Run backup
+        run: deploy/backups/backup.sh
+
+      - name: Upload backup artifact (30-day retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: /tmp/backups/*.gpg
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Alert on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 DB Backup Failed – ${new Date().toISOString()}`,
+              body: `The scheduled database backup failed.\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['devops', 'reliability'],
+            });
+
+  # ---------------------------------------------------------------------------
+  # Weekly restore drill — proves backups can actually be restored
+  # ---------------------------------------------------------------------------
+  restore-drill:
+    name: Restore drill
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'restore-drill' ||
+      github.event_name == 'schedule' && github.event.schedule == '0 3 * * 0'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bluecollar
+          POSTGRES_USER: bluecollar
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        options: >-
+          --health-cmd "pg_isready -U bluecollar"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_USER: bluecollar
+      PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+      BACKUP_DIR: /tmp/backups
+      GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y postgresql-client gpg
+
+      - name: Configure AWS credentials
+        if: ${{ secrets.BACKUP_S3_BUCKET != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Download latest backup from S3
+        if: ${{ secrets.BACKUP_S3_BUCKET != '' }}
+        run: |
+          mkdir -p /tmp/backups
+          aws s3 cp \
+            "$(aws s3 ls s3://${{ secrets.BACKUP_S3_BUCKET }}/db-backups/ | sort | tail -1 | awk '{print "s3://${{ secrets.BACKUP_S3_BUCKET }}/db-backups/"$4}')" \
+            /tmp/backups/
+
+      - name: Create seed backup for drill (no S3 configured)
+        if: ${{ secrets.BACKUP_S3_BUCKET == '' }}
+        run: |
+          mkdir -p /tmp/backups
+          chmod +x deploy/backups/backup.sh
+          S3_BUCKET="" deploy/backups/backup.sh
+
+      - name: Make script executable
+        run: chmod +x deploy/backups/restore-drill.sh
+
+      - name: Run restore drill
+        run: deploy/backups/restore-drill.sh
+
+      - name: Alert on drill failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 DB Restore Drill Failed – ${new Date().toISOString()}`,
+              body: `The weekly restore drill failed — backups may not be recoverable.\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['devops', 'reliability'],
+            });

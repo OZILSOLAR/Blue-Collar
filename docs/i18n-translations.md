@@ -1,6 +1,18 @@
-# Internationalization (i18n) & Translations Guide
+# Internationalization (i18n) & Translation Contributor Guide
 
-This guide explains how BlueCollar handles internationalization using `next-intl`, how translation files are structured, and how to add new languages or contribute translations.
+This guide covers how BlueCollar handles internationalization, how to contribute translations for the app UI and README files, and how to add support for a new locale.
+
+---
+
+## Quick Start for Translation Contributors
+
+1. Check open [i18n issues](https://github.com/Fidelis900/Blue-Collar/issues?q=is%3Aissue+is%3Aopen+label%3Ai18n) — someone may already be working on your language.
+2. Fork the repo and create a branch: `git checkout -b i18n/add-{language}`
+3. Translate the UI messages (see [Adding a New Language](#adding-a-new-language)).
+4. Optionally translate the README (see [README Translations](#readme-translations)).
+5. Open a PR with title format: `i18n: add {language} ({locale}) translations`
+
+---
 
 ## next-intl Configuration
 
@@ -41,7 +53,7 @@ import createMiddleware from 'next-intl/middleware'
 const intlMiddleware = createMiddleware({
   locales: ['en', 'fr', 'es'],
   defaultLocale: 'en',
-  localePrefix: 'always',   // All URLs include the locale prefix: /en/workers, /fr/workers
+  localePrefix: 'always',
 })
 ```
 
@@ -136,10 +148,10 @@ Follow these steps to add a new locale.
 Copy `en.json` as a starting point and translate all values. Keep all keys identical to the English file.
 
 ```bash
-cp packages/app/src/messages/en.json packages/app/src/messages/pt.json
+cp packages/app/src/messages/en.json packages/app/src/messages/{locale}.json
 ```
 
-Then translate the values in `pt.json`:
+Then translate the values in `{locale}.json`:
 
 ```json
 {
@@ -176,7 +188,7 @@ const locales = [
   { code: 'en', label: 'English' },
   { code: 'fr', label: 'Français' },
   { code: 'es', label: 'Español' },
-  { code: 'pt', label: 'Português' },  // add this
+  { code: 'pt', label: 'Português' },
 ]
 ```
 
@@ -186,32 +198,120 @@ The `[locale]` dynamic segment in `packages/app/src/app/[locale]/` handles all l
 
 ### 5. Test the new locale
 
-Start the dev server and navigate to `http://localhost:3000/pt` to verify the new locale loads correctly.
+Start the dev server and navigate to `http://localhost:3000/{locale}` to verify the new locale loads correctly.
+
+## README Translations
+
+The project also accepts translated README files alongside the English `README.md`. These are standalone Markdown files at the repo root.
+
+### Existing Translations
+
+| File            | Language   |
+|-----------------|------------|
+| `README.md`     | English    |
+| `README.pt.md`  | Portuguese |
+
+### Adding a README Translation
+
+1. Copy the English README:
+   ```bash
+   cp README.md README.{locale}.md
+   ```
+2. Translate all user-facing text while preserving code blocks, URLs, and file paths unchanged.
+3. Add a language switch link at the top below the title:
+   ```markdown
+   **[English](./README.md) | [Português](./README.{locale}.md)**
+   ```
+4. Add a "Translation" section at the bottom crediting yourself:
+   ```markdown
+   ## Translation
+
+   This translation was contributed by the community to make the project accessible to {language} speakers.
+
+   **Translator:** Your Name / Community
+   ```
+5. Update the English `README.md` to link to the new translation:
+   ```markdown
+   **[English](./README.md) | [Português](./README.{locale}.md)**
+   ```
+
+### Translators Section
+
+When submitting a README translation, add your name (or GitHub handle) in the final `## Translation` footer. If multiple people contributed, list them all.
 
 ## Translation Contribution Workflow
 
 ### For contributors adding or updating translations
 
-1. Fork the repository and create a branch: `git checkout -b i18n/add-portuguese`
+1. Fork the repository and create a branch: `git checkout -b i18n/add-{language}`
 2. Add or update the translation file in `packages/app/src/messages/`
 3. Ensure every key present in `en.json` also exists in your translation file — missing keys fall back to the key name, not the English value
-4. Open a pull request with the title format: `i18n: add Portuguese (pt) translations`
+4. Run the validation script (see below) to check for missing keys
+5. Open a pull request with the title format: `i18n: add {language} ({locale}) translations`
+
+### Validating Translations
+
+To find missing keys, compare your locale file against `en.json`:
+
+```bash
+# Deep comparison — finds missing keys at any nesting level
+node -e "
+const en = require('./packages/app/src/messages/en.json')
+const locale = require('./packages/app/src/messages/{locale}.json')
+
+function findMissing(base, target, path = '') {
+  return Object.keys(base).flatMap(k => {
+    const p = path ? path + '.' + k : k
+    if (!(k in target)) return [p]
+    if (typeof base[k] === 'object' && base[k] !== null && !Array.isArray(base[k]))
+      return findMissing(base[k], target[k], p)
+    return []
+  })
+}
+
+const missing = findMissing(en, locale)
+if (missing.length) {
+  console.log('Missing keys:', missing.join('\n  '))
+  process.exit(1)
+} else {
+  console.log('All keys present!')
+}
+"
+```
+
+You can also add this as a script in `packages/app/package.json`:
+
+```json
+{
+  "scripts": {
+    "i18n:check": "node -e \"...\""
+  }
+}
+```
+
+### PR Checklist for Translation Contributors
+
+- [ ] All keys from `en.json` are present in the translation file
+- [ ] Values are translated (not left as English)
+- [ ] Variables (`{count}`, `{name}`) are preserved — do not translate variable names
+- [ ] ICU plural syntax is correct for the target language
+- [ ] LanguageSwitcher component includes the new locale
+- [ ] Middleware `locales` array includes the new locale code
+- [ ] (Optional) README translation is included with language switcher link
+
+### Reviewer Checklist
+
+- [ ] Translation file is valid JSON
+- [ ] No keys are missing compared to `en.json`
+- [ ] Variable placeholders are intact
+- [ ] Language switcher and middleware are updated
+- [ ] README translation (if any) preserves URLs, code blocks, and file paths
 
 ### Keeping translations in sync
 
 When new features add strings to `en.json`, all other locale files must be updated. A missing key will render the raw key string (e.g., `workers.newFeature`) in the UI.
 
-To find missing keys, compare your locale file against `en.json`:
-
-```bash
-# Quick diff of top-level keys
-node -e "
-const en = require('./packages/app/src/messages/en.json')
-const pt = require('./packages/app/src/messages/pt.json')
-const missing = Object.keys(en).filter(k => !pt[k])
-console.log('Missing namespaces:', missing)
-"
-```
+The CI pipeline will eventually check for missing keys automatically. In the meantime, run the validation script above before merging any PR that adds new UI strings.
 
 ## Pluralization and Formatting Rules
 
@@ -286,3 +386,25 @@ Use ICU `select` for gender-aware or conditional strings:
   }
 }
 ```
+
+## Translation Guidelines
+
+### What to translate
+
+- All user-facing UI strings in the message JSON files
+- README content (prose, descriptions, instructions)
+
+### What NOT to translate
+
+- Variable names and placeholders (`{count}`, `{name}`, `{email}`)
+- Code blocks, commands, and file paths
+- URLs and links
+- Brand name "BlueCollar"
+- Technical terms that are universally understood (e.g., "API", "JSON", "JWT")
+
+### Language Quality
+
+- Use natural, idiomatic phrasing for the target language — avoid literal translations
+- Maintain consistent terminology throughout the file
+- Respect the tone of the original (professional, helpful, concise)
+- For regional variants (e.g., pt-BR vs pt-PT), add a note in the PR description

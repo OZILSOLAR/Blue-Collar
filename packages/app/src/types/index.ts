@@ -1,96 +1,40 @@
-// ─── Core domain types ────────────────────────────────────────────────────────
+// Re-export shared types from the canonical source package.
+// App-specific types that have no API counterpart are defined below.
+export type {
+  ApiResponse,
+  Meta,
+  PaginatedResult,
+  AuthUser,
+  Category,
+  PortfolioImage,
+  Worker,
+  CreateWorkerDTO,
+  UpdateWorkerDTO,
+  Review,
+  CreateReviewDTO,
+  AppNotification,
+  NotificationType,
+  Job,
+  JobApplication,
+  JobStatus,
+  JobUrgency,
+  ApplicationStatus,
+  TipDTO,
+  Message,
+  Conversation,
+  ConversationParticipant,
+  WorkerAnalytics,
+  RatingDistributionEntry,
+  AuditLogEntry,
+} from "@bluecollar/types";
 
-export interface Category {
-  id: string;
-  name: string;
-  icon?: string | null;
-}
+// ─── App-only types ───────────────────────────────────────────────────────────
 
-export interface PortfolioImage {
-  id: string;
-  url: string;
-  caption?: string | null;
-  order?: number;
-}
-
-export interface Worker {
-  id: string;
-  name: string;
-  bio?: string | null;
-  avatar?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  location?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  isVerified: boolean;
-  locationId?: string | null;
-  walletAddress?: string | null;
-  category: Category;
-  averageRating?: number | null;
-  reviewCount?: number;
-  portfolioImages?: PortfolioImage[];
-}
-
-export interface Review {
-  id: string;
-  rating: number;
-  comment?: string | null;
-  workerId: string;
-  authorId: string;
-  createdAt: string;
-  author: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    avatar?: string | null;
-  };
-}
-
-// ─── Auth types ───────────────────────────────────────────────────────────────
-
-/** Authenticated user shape returned from /auth/me and stored in AuthContext. */
-export interface AuthUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: "user" | "curator" | "admin";
-  verified: boolean;
-  avatar?: string | null;
-  onboardingCompleted?: boolean;
-}
-
-// ─── Pagination ───────────────────────────────────────────────────────────────
-
-export interface Meta {
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-}
-
-export interface RatingDistributionEntry {
-  rating: number;
-  count: number;
-  percentage: number;
-}
-
-// ─── API response wrappers ────────────────────────────────────────────────────
-
-/** Standard API envelope returned by all endpoints. */
-export interface ApiResponse<T> {
-  data: T;
-  meta?: Meta;
-  status: string;
-  code: number;
-  message?: string;
-}
-
-/** Paginated list response. */
+/** Paginated API envelope (alias kept for backwards-compat). */
+import type { ApiResponse, Meta } from "@bluecollar/types";
 export type PaginatedResponse<T> = ApiResponse<T[]> & { meta: Meta };
 
-// ─── Form types ───────────────────────────────────────────────────────────────
+// ─── Form types (app-side only) ───────────────────────────────────────────────
 
 export interface LoginForm {
   email: string;
@@ -104,25 +48,7 @@ export interface RegisterForm {
   password: string;
 }
 
-// ── Analytics types ──────────────────────────────────────────────────────────
-
-export interface WorkerAnalytics {
-  workerId: string;
-  workerName: string;
-  category: string;
-  totalViews: number;
-  uniqueViews: number;
-  viewsLast30Days: number;
-  totalTips: number;
-  tipCount: number;
-  bookmarkCount: number;
-  contactCount: number;
-  contactsLast30Days: number;
-  responseRate: number;
-  avgRating: number;
-  reviewCount: number;
-  updatedAt: string | null;
-}
+// ─── Analytics types (app-only views) ────────────────────────────────────────
 
 export interface WorkerSummary {
   id: string;
@@ -208,6 +134,43 @@ export interface ViewTrend {
   views: number;
 }
 
+export interface WorkerDashboardSeriesPoint {
+  date: string;
+  views: number;
+  uniqueViews: number;
+  tips: number;
+  tipCount: number;
+  avgRating: number | null;
+  reviewCount: number;
+  earnings: number;
+}
+
+export interface WorkerPersonalDashboard {
+  worker: { id: string; name: string; category: string; walletAddress?: string | null };
+  range: { startDate: string; endDate: string };
+  summary: {
+    totalViews: number;
+    uniqueViews: number;
+    tipsReceived: number;
+    tipCount: number;
+    avgRating: number;
+    reviewCount: number;
+    earnings: number;
+    contacts: number;
+  };
+  deltas: {
+    totalViews: number;
+    uniqueViews: number;
+    tipsReceived: number;
+    avgRating: number;
+    earnings: number;
+  };
+  charts: {
+    series: WorkerDashboardSeriesPoint[];
+    ratingDistribution: Array<{ rating: number; count: number }>;
+  };
+}
+
 export interface TopWorker {
   rank: number;
   workerId: string;
@@ -219,45 +182,6 @@ export interface TopWorker {
   avgRating: number;
 }
 
-// ─── Jobs ─────────────────────────────────────────────────────────────────────
-
-export type JobStatus = "open" | "closed" | "expired" | "filled";
-export type JobUrgency = "low" | "normal" | "urgent";
-export type ApplicationStatus = "pending" | "accepted" | "rejected" | "withdrawn";
-
-export interface Job {
-  id: string;
-  title: string;
-  description: string;
-  budget?: number | null;
-  skills: string[];
-  urgency: JobUrgency;
-  escrowAmount?: number | null;
-  escrowTxId?: string | null;
-  status: JobStatus;
-  expiresAt?: string | null;
-  renewedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  category: Category;
-  location?: { id: string; city: string; state?: string | null; country: string } | null;
-  postedBy: { id: string; firstName: string; lastName: string; avatar?: string | null };
-  _count?: { applications: number; messages: number };
-}
-
-export interface JobApplication {
-  id: string;
-  jobId: string;
-  workerId: string;
-  coverLetter?: string | null;
-  proposedRate?: number | null;
-  status: ApplicationStatus;
-  createdAt: string;
-  updatedAt: string;
-  job?: { id: string; title: string; postedById: string };
-  worker?: { id: string; name: string; avatar?: string | null; email?: string | null; category?: Category };
-}
-
 export interface JobMessage {
   id: string;
   jobId: string;
@@ -266,65 +190,4 @@ export interface JobMessage {
   createdAt: string;
   sender: { id: string; firstName: string; lastName: string; avatar?: string | null };
   recipient: { id: string; firstName: string; lastName: string; avatar?: string | null };
-}
-
-// ── Notifications ───────────────────────────────────────────────────────────
-
-export type NotificationType = "tip" | "review" | "contact" | "system" | "message";
-
-export interface AppNotification {
-  id: string;
-  userId: string;
-  type: NotificationType;
-  title: string;
-  message?: string | null;
-  href?: string | null;
-  read: boolean;
-  createdAt: string;
-}
-
-// ── Conversations ───────────────────────────────────────────────────────────
-
-export interface Conversation {
-  id: string;
-  subject?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  participants: ConversationParticipant[];
-  messages?: Message[];
-  unreadCount?: number;
-}
-
-export interface ConversationParticipant {
-  id: string;
-  conversationId: string;
-  userId: string;
-  lastReadAt?: string | null;
-  joinedAt: string;
-  user: { id: string; firstName: string; lastName: string; avatar?: string | null };
-}
-
-export interface Message {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  body: string;
-  attachmentUrl?: string | null;
-  attachmentType?: string | null;
-  readAt?: string | null;
-  createdAt: string;
-  sender: { id: string; firstName: string; lastName: string; avatar?: string | null };
-}
-
-// ── Audit Log ──────────────────────────────────────────────────────────────
-
-export interface AuditLogEntry {
-  id: string;
-  userId?: string | null;
-  action: string;
-  resource?: string | null;
-  resourceId?: string | null;
-  meta?: Record<string, unknown> | null;
-  createdAt: string;
-  user?: { id: string; firstName: string; lastName: string; email: string } | null;
 }

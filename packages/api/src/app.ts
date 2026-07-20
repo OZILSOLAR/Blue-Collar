@@ -1,11 +1,12 @@
 import express from 'express'
-import cors from 'cors'
 import methodOverride from 'method-override'
 import passport from './config/passport.js'
 import { redis, cacheMetrics } from './config/redis.js'
 import { db } from './db.js'
+import { disconnectDb } from './db.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { registerEventHandlers } from './events/index.js'
+import { applySecurity, depthLimiter } from './middleware/security.js'
 import authRoutes from './routes/auth.js'
 import categoryRoutes from './routes/categories.js'
 import workerRoutes from './routes/workers.js'
@@ -26,8 +27,9 @@ import notificationRoutes from './routes/notifications.js'
 import conversationRoutes from './routes/conversations.js'
 import helpfulRoutes from './routes/helpful.js'
 import vitalsRoutes from './routes/vitals.js'
+import devicesRoutes from './routes/devices.js'
 import { auditMiddleware } from './middleware/audit.js'
-import { sanitize } from './middleware/sanitize.js'
+import { sanitize, sanitizeParams } from './middleware/sanitize.js'
 import { versionMiddleware, deprecationWarning, versionDeprecationMiddleware } from './middleware/version.js'
 import { responseSchemaVersioning } from './utils/schemaVersioning.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
@@ -53,10 +55,12 @@ registerEventHandlers()
 // Connect Redis (non-blocking — app starts even if Redis is down)
 redis.connect().catch(() => {})
 
-app.use(cors())
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+applySecurity(app)
+app.use(express.json({ limit: '100kb' }))
+app.use(express.urlencoded({ extended: true, limit: '100kb' }))
 app.use(sanitize)
+app.use(sanitizeParams)
+app.use(depthLimiter)
 app.use(metricsMiddleware)
 app.use(requestLogger)
 app.use(methodOverride('X-HTTP-Method'))
@@ -88,7 +92,11 @@ app.use('/api/jobs', jobRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/conversations', conversationRoutes)
 app.use('/api/reviews', helpfulRoutes)
+app.use('/api/auth', devicesRoutes)
 app.use('/api', vitalsRoutes)
+app.use('/api/wallet', walletRoutes)
+app.use('/api/events', indexerRoutes)
+app.use('/api/escrow', escrowRoutes)
 // ── Versioned routes (v1) ─────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/categories', categoryRoutes)
@@ -109,6 +117,7 @@ app.use('/api/v1/jobs', jobRoutes)
 app.use('/api/v1/notifications', notificationRoutes)
 app.use('/api/v1/conversations', conversationRoutes)
 app.use('/api/v1/reviews', helpfulRoutes)
+app.use('/api/v1/auth', devicesRoutes)
 
 // ── Versioned routes (v2) ─────────────────────────────────────────────────────
 app.use('/api/v2/auth', authRoutes)
@@ -118,6 +127,7 @@ app.use('/api/v2/admin', adminRoutes)
 app.use('/api/v2/users', userRoutes)
 app.use('/api/v2/disputes', disputeRoutes)
 app.use('/api/v2/recommendations', recommendationRoutes)
+app.use('/api/v2/auth', devicesRoutes)
 app.use('/api/v2/webhooks', webhookRoutes)
 app.use('/api/v2/verifications', verificationRoutes)
 app.use('/api/v2/audit', auditRoutes)
@@ -128,10 +138,12 @@ app.use('/api/v2/payments', paymentRoutes)
 app.use('/api/v2/notifications', notificationRoutes)
 app.use('/api/v2/conversations', conversationRoutes)
 app.use('/api/v2/reviews', helpfulRoutes)
+app.use('/api/v2/wallet', walletRoutes)
+app.use('/api/v2/events', indexerRoutes)
+app.use('/api/v2/escrow', escrowRoutes)
 
 // ── Version endpoint ──────────────────────────────────────────────────────────
 app.get('/api/version', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   res.json({
     apiPackageVersion: API_VERSION,
     apiVersions: Array.from(VERSION_CONFIG.supported),
@@ -142,7 +154,6 @@ app.get('/api/version', (_req, res) => {
 })
 
 app.get('/api/v1/version', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   res.json({
     version: API_VERSION,
     apiVersion: 'v1',
@@ -154,7 +165,6 @@ app.get('/api/v1/version', (_req, res) => {
 })
 
 app.get('/api/v2/version', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   res.json({
     version: API_VERSION,
     apiVersion: 'v2',
@@ -166,7 +176,6 @@ app.get('/api/v2/version', (_req, res) => {
 })
 
 app.get('/api/v1/versions', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   const versionInfo = Array.from(VERSION_CONFIG.supported).map(v => ({
     version: v,
     status: VERSION_CONFIG.deprecated.includes(v) ? 'deprecated' : 'current',
@@ -181,7 +190,6 @@ app.get('/api/v1/versions', (_req, res) => {
 })
 
 app.get('/api/v2/versions', (_req, res) => {
-  const { VERSION_CONFIG } = await import('./middleware/version.js')
   const versionInfo = Array.from(VERSION_CONFIG.supported).map(v => ({
     version: v,
     status: VERSION_CONFIG.deprecated.includes(v) ? 'deprecated' : 'current',
@@ -212,7 +220,8 @@ app.put('/api/v2/admin/rollout', updateRolloutEndpoint)
 
 // ── Redirect unversioned /api/* → /api/v1/* with deprecation headers ──────────
 app.use('/api', deprecationWarning, (req, res) => {
-  const target = `/api/v1${req.path}${req.search ?? (Object.keys(req.query).length ? '?' + new URLSearchParams(req.query as any).toString() : '')}`
+  const qs = Object.keys(req.query).length ? '?' + new URLSearchParams(req.query as any).toString() : ''
+  const target = `/api/v1${req.path}${qs}`
   res.redirect(301, target)
 })
 
@@ -271,5 +280,22 @@ app.use(notFoundHandler)
 
 // Global error handler — must be last
 app.use(errorHandler)
+
+// ── Graceful shutdown (#836) ───────────────────────────────────────────────────
+// Drain in-flight requests and close both Prisma pool connections cleanly.
+// Kubernetes / PM2 send SIGTERM; Ctrl+C sends SIGINT.
+async function gracefulShutdown(signal: string): Promise<void> {
+  console.log(`[shutdown] ${signal} received — closing database connections…`)
+  try {
+    await disconnectDb()
+    console.log('[shutdown] Database connections closed.')
+  } catch (err) {
+    console.error('[shutdown] Error closing database connections:', err)
+  }
+  process.exit(0)
+}
+
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.once('SIGINT',  () => gracefulShutdown('SIGINT'))
 
 export default app

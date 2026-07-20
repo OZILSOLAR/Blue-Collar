@@ -1,0 +1,43 @@
+name: Documentation
+description: Report a documentation issue or suggest improvements
+labels: [documentation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve BlueCollar's documentation. This template is for reporting issues, suggesting improvements, or proposing new docs.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Correction (typo, outdated content, broken link)
+        - Improvement (clarify, restructure, add examples)
+        - New document
+        - Translation
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Document Location
+      description: Which file or section does this refer to?
+      placeholder: docs/CONTRIBUTING_GUIDE.md or README.md > "Getting Started"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What should be changed, added, or clarified?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Content (optional)
+      description: If you have a specific rewrite or addition in mind, paste it here.

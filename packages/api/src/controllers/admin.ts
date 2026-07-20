@@ -171,3 +171,88 @@ export async function banUser(req: Request, res: Response) {
   })
   return res.json({ data: { id: req.params.id, banned: true }, status: 'success', code: 200 })
 }
+
+/**
+ * PATCH /api/admin/users/:id/role
+ * Change a user's role. Admins cannot demote other admins.
+ * Body: { role: 'user' | 'curator' | 'admin' }
+ */
+export async function changeRole(req: Request, res: Response) {
+  const { role } = req.body as { role?: string }
+  if (!role || !['user', 'curator', 'admin'].includes(role)) {
+    return res.status(400).json({ status: 'error', message: 'role must be one of: user, curator, admin', code: 400 })
+  }
+
+  const user = await db.user.findUnique({ where: { id: req.params.id } })
+  if (!user) return res.status(404).json({ status: 'error', message: 'User not found', code: 404 })
+  if (user.role === 'admin' && req.user!.id !== user.id) {
+    return res.status(403).json({ status: 'error', message: 'Cannot change role of another admin', code: 403 })
+  }
+
+  const updated = await db.user.update({
+    where: { id: req.params.id },
+    data: { role: role as any },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true },
+  })
+  await db.auditLog.create({
+    data: {
+      userId: req.user!.id,
+      action: 'user.change_role',
+      resource: 'user',
+      resourceId: req.params.id,
+      meta: { previousRole: user.role, newRole: role },
+    },
+  })
+  return res.json({ data: updated, status: 'success', code: 200 })
+}
+
+/**
+ * PATCH /api/admin/workers/:id/moderate
+ * Approve or reject a worker listing.
+ * Body: { action: 'approve' | 'reject', reason?: string }
+ */
+export async function moderateWorker(req: Request, res: Response) {
+  const { action, reason } = req.body as { action?: string; reason?: string }
+  if (!action || !['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ status: 'error', message: 'action must be approve or reject', code: 400 })
+  }
+
+  const worker = await db.worker.findUnique({ where: { id: req.params.id } })
+  if (!worker) return res.status(404).json({ status: 'error', message: 'Worker not found', code: 404 })
+
+  const isActive = action === 'approve'
+  const updated = await db.worker.update({
+    where: { id: req.params.id },
+    data: { isActive, isVerified: isActive },
+    select: { id: true, name: true, isActive: true, isVerified: true },
+  })
+  await db.auditLog.create({
+    data: {
+      userId: req.user!.id,
+      action: `worker.${action}`,
+      resource: 'worker',
+      resourceId: req.params.id,
+      meta: { reason: reason ?? null },
+    },
+  })
+  return res.json({ data: updated, status: 'success', code: 200 })
+}
+
+/**
+ * GET /api/admin/audit
+ * Query audit logs with optional filters.
+ */
+export async function listAuditLogs(req: Request, res: Response) {
+  const { userId, action, resource, from, to, page = '1', limit = '50' } = req.query as Record<string, string>
+  const { queryLogs } = await import('../services/audit.service.js')
+  const result = await queryLogs({
+    userId,
+    action,
+    resource,
+    from: from ? new Date(from) : undefined,
+    to: to ? new Date(to) : undefined,
+    page: Number(page),
+    limit: Number(limit),
+  })
+  return res.json({ ...result, status: 'success', code: 200 })
+}

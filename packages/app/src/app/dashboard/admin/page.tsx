@@ -3,17 +3,7 @@
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import dynamic from "next/dynamic";
 import {
   Users,
   Briefcase,
@@ -36,6 +26,12 @@ import { formatDate } from "@/lib/utils";
 import { AdminDashboardSkeleton } from "@/components/Skeleton";
 import type { PlatformAnalytics, Category } from "@/types";
 import Link from "next/link";
+
+// ── Dynamic imports (code splitting: recharts is ~200KB) ─────────────────────
+const AdminCharts = dynamic(
+  () => import("@/components/charts/AdminCharts"),
+  { ssr: false, loading: () => <div className="h-[300px] rounded-lg bg-gray-50 animate-pulse" /> }
+);
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
 const TOKEN_KEY = "bc_token";
@@ -305,43 +301,19 @@ function OverviewTab({ data }: { data: PlatformAnalytics }) {
       <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div className="rounded-lg border bg-white p-6">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">User Growth (6 months)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.trends.userGrowth}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" fontSize={12} />
-              <YAxis fontSize={12} />
-              <Tooltip />
-              <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} name="New Users" />
-            </LineChart>
-          </ResponsiveContainer>
+          <AdminCharts.UserGrowthChart data={data.trends.userGrowth} />
         </div>
 
         <div className="rounded-lg border bg-white p-6">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Worker Growth (6 months)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.trends.workerGrowth}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" fontSize={12} />
-              <YAxis fontSize={12} />
-              <Tooltip />
-              <Line type="monotone" dataKey="count" stroke="#16a34a" strokeWidth={2} name="New Workers" />
-            </LineChart>
-          </ResponsiveContainer>
+          <AdminCharts.WorkerGrowthChart data={data.trends.workerGrowth} />
         </div>
       </div>
 
       {/* Top Categories Chart */}
       <div className="mb-8 rounded-lg border bg-white p-6">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Top Categories</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data.topCategories}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <Tooltip />
-            <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        <AdminCharts.TopCategoriesChart data={data.topCategories} />
       </div>
 
       {/* Recent Activity */}

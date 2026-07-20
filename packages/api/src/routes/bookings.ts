@@ -1,21 +1,44 @@
+/**
+ * Booking routes — Issue #776
+ */
 import { Router } from 'express'
-import { createBooking, confirmBooking, cancelBooking, listMyBookings } from '../controllers/bookings.js'
-import { authenticate } from '../middleware/auth.js'
-import { validate } from '../middleware/validate.js'
-import { createBookingRules, listMyBookingsQuery } from '../validations/booking.js'
-import { userRateLimit } from '../middleware/userRateLimit.js'
+import { authenticateJWT } from '../middleware/auth.js'
+import { bookingRateLimit } from '../middleware/rateLimit.js'
+import {
+  createBooking,
+  confirmBooking,
+  cancelBooking,
+  getMyBookings,
+} from '../controllers/bookings.js'
 
 const router = Router()
 
-const bookingRateLimit = userRateLimit({
-  windowSec: 3600,
-  anonLimit: 0,
-  authLimit: 10,
-})
+// All booking routes require authentication
+router.use(authenticateJWT)
 
-router.post('/', authenticate, bookingRateLimit, validate(createBookingRules), createBooking)
-router.get('/mine', authenticate, validate(listMyBookingsQuery, 'query'), listMyBookings)
-router.patch('/:id/confirm', authenticate, confirmBooking)
-router.patch('/:id/cancel', authenticate, cancelBooking)
+/**
+ * POST /bookings
+ * Create a booking request. Rate-limited to 10/hr per user.
+ */
+router.post('/', bookingRateLimit, createBooking)
+
+/**
+ * GET /bookings/mine
+ * List bookings for the authenticated user.
+ * ?role=worker|requester&status=pending|confirmed|cancelled|completed
+ */
+router.get('/mine', getMyBookings)
+
+/**
+ * PATCH /bookings/:id/confirm
+ * Confirm a pending booking (worker only).
+ */
+router.patch('/:id/confirm', confirmBooking)
+
+/**
+ * PATCH /bookings/:id/cancel
+ * Cancel a booking (worker or requester).
+ */
+router.patch('/:id/cancel', cancelBooking)
 
 export default router

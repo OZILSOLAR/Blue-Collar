@@ -17,9 +17,11 @@ import {
 
 const STORAGE_KEY = "bc_wallet_address";
 
-interface WalletContextValue {
+export interface WalletContextValue {
   publicKey: string | null;
   network: string | null;
+  balance: string | null;
+  networkWarning: boolean;
   isConnected: boolean;
   isConnecting: boolean;
   connect: () => Promise<void>;
@@ -29,34 +31,40 @@ interface WalletContextValue {
 const WalletContext = createContext<WalletContextValue>({
   publicKey: null,
   network: null,
+  balance: null,
+  networkWarning: false,
   isConnected: false,
   isConnecting: false,
   connect: async () => {},
   disconnect: () => {},
 });
 
+async function fetchBalance(address: string): Promise<string | null> {
+  try {
+    const json = await fetch(`https://horizon-testnet.stellar.org/accounts/${address}`).then((r) => r.json());
+    return json.balances?.find((b: { asset_type: string; balance: string }) => b.asset_type === "native")?.balance ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [network, setNetwork] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [balance, setBalance] = useState<string | null>(null);
 
-  // Restore persisted connection on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return;
-
-    // Verify Freighter still has the address (extension may have been removed)
     isConnected()
       .then(async (res) => {
-        if (!res.isConnected) {
-          localStorage.removeItem(STORAGE_KEY);
-          return;
-        }
+        if (!res.isConnected) { localStorage.removeItem(STORAGE_KEY); return; }
         const { address } = await getAddress();
         const { network: net } = await getNetwork();
         if (address === stored) {
           setPublicKey(address);
           setNetwork(net);
+          setBalance(await fetchBalance(address));
         } else {
           localStorage.removeItem(STORAGE_KEY);
         }
@@ -64,19 +72,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       .catch(() => localStorage.removeItem(STORAGE_KEY));
   }, []);
 
+  const [isConnecting, setIsConnecting] = useState(false);
+
   const connect = useCallback(async () => {
     setIsConnecting(true);
     try {
       const connected = await isConnected();
-      if (!connected.isConnected) {
-        window.open("https://www.freighter.app", "_blank");
-        return;
-      }
+      if (!connected.isConnected) { window.open("https://www.freighter.app", "_blank"); return; }
       await requestAccess();
       const { address } = await getAddress();
       const { network: net } = await getNetwork();
       setPublicKey(address);
       setNetwork(net);
+      setBalance(await fetchBalance(address));
       localStorage.setItem(STORAGE_KEY, address);
     } catch (err) {
       console.error("[WalletContext] connect error:", err);
@@ -88,20 +96,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(() => {
     setPublicKey(null);
     setNetwork(null);
+    setBalance(null);
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  const networkWarning = !!network && network !== "TESTNET";
+
   return (
-    <WalletContext.Provider
-      value={{
-        publicKey,
-        network,
-        isConnected: !!publicKey,
-        isConnecting,
-        connect,
-        disconnect,
-      }}
-    >
+    <WalletContext.Provider value={{ publicKey, network, balance, networkWarning, isConnected: !!publicKey, isConnecting, connect, disconnect }}>
       {children}
     </WalletContext.Provider>
   );

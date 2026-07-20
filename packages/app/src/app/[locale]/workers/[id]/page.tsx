@@ -4,8 +4,10 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import PortfolioGallery from "@/components/PortfolioGallery";
 import ReviewsSection from "@/components/ReviewsSection";
-import EmptyState from "@/components/EmptyState";
 import AvailabilityCalendar from "@/components/AvailabilityCalendar";
+import VerificationBadges from "@/components/VerificationBadges";
+import RatingBreakdown from "@/components/RatingBreakdown";
+import OnChainBadge from "@/components/WorkerProfile/OnChainBadge";
 import { WorkerHeader } from "./components/WorkerHeader";
 import { WorkerContactDetails } from "./components/WorkerContactDetails";
 import { WorkerTipSection } from "./components/WorkerTipSection";
@@ -33,11 +35,7 @@ async function fetchAvailability(id: string) {
   return (json.data ?? []) as { dayOfWeek: number; startTime: string; endTime: string }[];
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { id: string };
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const worker = await fetchWorker(params.id);
   if (!worker) return { title: "Worker Not Found" };
   return {
@@ -51,11 +49,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function WorkerProfilePage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function WorkerProfilePage({ params }: { params: { id: string } }) {
   const [data, reviewsData, availability] = await Promise.all([
     fetchWorker(params.id),
     fetchReviews(params.id),
@@ -68,16 +62,29 @@ export default async function WorkerProfilePage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <Link
-        href="/workers"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
-      >
+      <Link href="/workers" className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
         <ArrowLeft size={15} aria-hidden="true" />
         Back to workers
       </Link>
 
       <div className="rounded-2xl border bg-white p-8 shadow-sm">
-        <WorkerHeader worker={worker} averageRating={averageRating} reviewCount={reviewCount} />
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <WorkerHeader worker={worker} averageRating={averageRating} reviewCount={reviewCount} />
+          </div>
+          <OnChainBadge
+            contractId={process.env.NEXT_PUBLIC_REGISTRY_CONTRACT_ID}
+            workerId={worker.id}
+          />
+        </div>
+
+        <VerificationBadges
+          isVerified={worker.isVerified}
+          hasPhone={!!worker.phone}
+          hasEmail={!!worker.email}
+          hasWallet={!!worker.walletAddress}
+          hasAvatar={!!worker.avatar}
+        />
 
         {worker.bio && (
           <p className="mt-6 text-sm leading-relaxed text-gray-600">{worker.bio}</p>
@@ -85,12 +92,10 @@ export default async function WorkerProfilePage({
 
         <WorkerContactDetails worker={worker} />
 
-        {/* Availability calendar */}
         <div className="mt-8 border-t pt-6">
           <AvailabilityCalendar availability={availability} />
         </div>
 
-        {/* Portfolio gallery */}
         {worker.portfolioImages && worker.portfolioImages.length > 0 && (
           <div className="mt-8 border-t pt-6">
             <h2 className="text-base font-semibold text-gray-900 mb-4">Portfolio</h2>
@@ -98,12 +103,16 @@ export default async function WorkerProfilePage({
           </div>
         )}
 
-        {/* Tip section */}
         <div className="mt-8 border-t pt-6">
           <WorkerTipSection workerName={worker.name} walletAddress={worker.walletAddress} />
         </div>
 
-        {/* Reviews section */}
+        <RatingBreakdown
+          averageRating={averageRating}
+          reviewCount={reviewCount}
+          distribution={distribution ?? []}
+        />
+
         <ReviewsSection
           workerId={worker.id}
           initialReviews={reviews}

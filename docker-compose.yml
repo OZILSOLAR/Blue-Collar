@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: bluecollar
-      POSTGRES_PASSWORD: bluecollar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bluecollar}
       POSTGRES_DB: bluecollar
     ports:
       - "5432:5432"
@@ -42,7 +42,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://bluecollar:bluecollar@db:5432/bluecollar
+      DATABASE_URL: postgresql://bluecollar:${POSTGRES_PASSWORD:-bluecollar}@db:5432/bluecollar
       REDIS_URL: redis://redis:6379
       NODE_ENV: production
     env_file:
@@ -53,6 +53,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  app:
+    build:
+      context: .
+      dockerfile: packages/app/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+        NEXT_PUBLIC_STELLAR_NETWORK: ${NEXT_PUBLIC_STELLAR_NETWORK:-TESTNET}
+        NEXT_PUBLIC_MARKET_CONTRACT_ID: ${NEXT_PUBLIC_MARKET_CONTRACT_ID:-}
+        NEXT_PUBLIC_REGISTRY_CONTRACT_ID: ${NEXT_PUBLIC_REGISTRY_CONTRACT_ID:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
 
   adminer:
     image: adminer:latest

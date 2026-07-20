@@ -419,3 +419,195 @@ NEXT_PUBLIC_MARKET_CONTRACT_ID=C...testnet_contract_id
 # Mainnet (set in production environment)
 NEXT_PUBLIC_MARKET_CONTRACT_ID=C...mainnet_contract_id
 ```
+
+---
+
+## Contributing a New Wallet Adapter
+
+This section walks through the full process of adding a new Stellar wallet to BlueCollar.
+
+### 1. Understand the Adapter Interface
+
+Every wallet must implement the `WalletAdapter` interface in `packages/app/src/lib/walletAdapter.ts`:
+
+```typescript
+export interface WalletAdapter {
+  isAvailable(): Promise<boolean>
+  connect(): Promise<string>
+  getNetwork(): Promise<string>
+  signTransaction(xdr: string, networkPassphrase: string): Promise<string>
+}
+```
+
+### 2. Research the Wallet's API
+
+Each Stellar wallet exposes a different API. Check their documentation for:
+
+- **Installation check** — How to detect if the wallet is installed (e.g. `window` object check, SDK availability)
+- **Connection** — How to request the user's public key
+- **Network detection** — How to get the current network (TESTNET/PUBLIC)
+- **Transaction signing** — How to sign an XDR blob
+
+Common wallet SDKs:
+
+| Wallet | Package | Docs |
+|--------|---------|------|
+| Freighter | `@stellar/freighter-api` | [docs.freighter.app](https://docs.freighter.app) |
+| xBull | `@creit.tech/xbull-wallet-connect` | [xbull.app](https://xbull.app) |
+| Lobstr (WalletConnect) | `@creit.tech/stellar-wallets-kit` | [lobstr.co](https://lobstr.co) |
+| Albedo | `@albedo-link/intent` | [albedo.link](https://albedo.link) |
+| Rabet | `@rabeto/wallet-sdk` | [rabet.io](https://rabet.io) |
+
+### 3. Create the Adapter File
+
+Create a new file `packages/app/src/lib/wallets/{walletName}Adapter.ts`:
+
+```typescript
+import { WalletAdapter } from '../walletAdapter'
+
+export const albedoAdapter: WalletAdapter = {
+  async isAvailable() {
+    return typeof window !== 'undefined' && !!window.albedo
+  },
+  async connect() {
+    const res = await window.albedo.publicKey()
+    return res.publicKey
+  },
+  async getNetwork() {
+    return 'TESTNET'
+  },
+  async signTransaction(xdr: string, networkPassphrase: string) {
+    const res = await window.albedo.tx({ xdr, network: networkPassphrase })
+    return res.signedTxXdr
+  },
+}
+```
+
+### 4. Register the Adapter
+
+Add the new adapter to the wallet selector in `packages/app/src/context/WalletContext.tsx`:
+
+```typescript
+import { freighterAdapter } from '@/lib/wallets/freighterAdapter'
+import { xBullAdapter } from '@/lib/wallets/xBullAdapter'
+import { lobstrAdapter } from '@/lib/wallets/lobstrAdapter'
+import { albedoAdapter } from '@/lib/wallets/albedoAdapter'
+
+const adapters: Record<string, WalletAdapter> = {
+  freighter: freighterAdapter,
+  xbull: xBullAdapter,
+  lobstr: lobstrAdapter,
+  albedo: albedoAdapter,
+}
+```
+
+### 5. Update the Wallet Selector UI
+
+If the wallet requires a UI selector (e.g., for WalletConnect-based wallets), update `packages/app/src/components/WalletSelector.tsx` to include the new option.
+
+### 6. Test the Adapter
+
+**Test each adapter method:**
+
+```typescript
+// Manual test in browser console
+const adapter = albedoAdapter
+console.log('Available:', await adapter.isAvailable())
+console.log('Address:', await adapter.connect())
+console.log('Network:', await adapter.getNetwork())
+```
+
+**End-to-end payment flow:**
+
+1. Start the app locally: `cd packages/app && pnpm dev`
+2. Open `http://localhost:3001/en/workers`
+3. Connect the new wallet
+4. Send a tip to a test worker on testnet
+5. Verify the transaction appears on [Stellar Expert (testnet)](https://stellar.expert/explorer/testnet)
+
+### 7. Open a Pull Request
+
+Submit a PR with title format: `feat(app): add {walletName} wallet adapter`
+
+Include in the PR description:
+- A link to the wallet's documentation
+- Any SDK dependencies added to `package.json`
+- Testnet transaction hash(es) showing the flow works
+
+### Wallet Integration Checklist
+
+- [ ] Adapter implements all four `WalletAdapter` methods
+- [ ] `isAvailable()` correctly detects the wallet (returns `false` when not installed)
+- [ ] `connect()` returns a valid Stellar public key (G...)
+- [ ] `getNetwork()` returns the correct network string
+- [ ] `signTransaction()` produces a valid signed XDR
+- [ ] Wallet is registered in `WalletContext.tsx` adapters map
+- [ ] Wallet selector UI includes the new option
+- [ ] End-to-end tip flow works on testnet
+- [ ] Error handling covers: not installed, access denied, signing cancelled, network mismatch
+- [ ] No new dependencies added without review (if required, justify in PR)
+
+## Testing Wallet Integration
+
+### Unit Tests
+
+Test the adapter in isolation by mocking the wallet SDK:
+
+```typescript
+// packages/app/src/lib/wallets/__tests__/freighterAdapter.test.ts
+import { describe, it, expect, vi } from 'vitest'
+
+const mockFreighter = {
+  isConnected: vi.fn(),
+  requestAccess: vi.fn(),
+  getAddress: vi.fn(),
+  getNetwork: vi.fn(),
+  signTransaction: vi.fn(),
+}
+
+vi.mock('@stellar/freighter-api', () => mockFreighter)
+
+describe('freighterAdapter', () => {
+  it('returns true when freighter is installed', async () => {
+    mockFreighter.isConnected.mockResolvedValue({ isConnected: true })
+    const { freighterAdapter } = await import('../freighterAdapter')
+    expect(await freighterAdapter.isAvailable()).toBe(true)
+  })
+
+  it('returns the connected address', async () => {
+    mockFreighter.requestAccess.mockResolvedValue(undefined)
+    mockFreighter.getAddress.mockResolvedValue({ address: 'GA...' })
+    const { freighterAdapter } = await import('../freighterAdapter')
+    expect(await freighterAdapter.connect()).toBe('GA...')
+  })
+})
+```
+
+### Integration Tests (Manual)
+
+Before opening a PR, run through this checklist manually:
+
+| Test Case | Expected Result |
+|---|---|
+| Wallet not installed | `isAvailable()` returns `false`, UI shows install prompt |
+| User clicks Connect | Wallet popup appears, address returned |
+| User rejects access | Error thrown, UI shows "Access denied" |
+| User signs transaction | Signed XDR returned, transaction submitted |
+| Network mismatch | Error thrown, UI shows "Please switch network" |
+| Insufficient funds | Horizon error, UI shows balance warning |
+
+## Environment Variables Reference
+
+All Stellar-related environment variables used across the app:
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_STELLAR_NETWORK` | Yes | `testnet` or `mainnet` |
+| `NEXT_PUBLIC_HORIZON_URL` | Yes | Horizon RPC endpoint |
+| `NEXT_PUBLIC_SOROBAN_RPC` | Yes | Soroban RPC endpoint |
+| `NEXT_PUBLIC_NETWORK_PASSPHRASE` | Yes | Network passphrase for signing |
+| `NEXT_PUBLIC_MARKET_CONTRACT_ID` | Yes | Deployed Market contract address |
+| `NEXT_PUBLIC_REGISTRY_CONTRACT_ID` | Yes | Deployed Registry contract address |
+| `NEXT_PUBLIC_STELLAR_EXPLORER` | No | Custom explorer URL (defaults to stellar.expert) |
+
+Set these in `packages/app/.env` for local development and in your deployment environment for production.
