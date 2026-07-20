@@ -11,38 +11,43 @@ describe('Route Registration Guard', () => {
   it('should not have orphaned/unmounted route files', () => {
     const routesDir = join(import.meta.dirname, '../routes')
     const controllersDir = join(import.meta.dirname, '../controllers')
-    const indexPath = join(import.meta.dirname, '../index.ts')
+    const appPath = join(import.meta.dirname, '../app.ts')
 
     // Get all route files
     const routeFiles = readdirSync(routesDir)
       .filter(f => f.endsWith('.ts') && !f.includes('.test.'))
       .map(f => f.replace('.ts', ''))
 
-    // Read index.ts to see which routes are mounted
-    const indexContent = readFileSync(indexPath, 'utf-8')
+    // Read app.ts to see which routes are mounted
+    const appContent = readFileSync(appPath, 'utf-8')
 
     const unmountedRoutes: string[] = []
 
     for (const routeFile of routeFiles) {
       // Check if route is imported
-      const importRegex = new RegExp(
-        `import.*from\\s+['"]\\.*/routes/${routeFile}(?:\\.js)?['"]\\.?`,
-        'i'
+      // Pattern: import xxxRoutes from './routes/xxx.js' or similar variations
+      const importMatch = appContent.match(
+        new RegExp(
+          `import\\s+(\\w+)\\s+from\\s+['\"].*routes/${routeFile}(?:\\.js)?['"]`,
+          'i'
+        )
       )
-      if (!importRegex.test(indexContent)) {
+      
+      if (!importMatch) {
         unmountedRoutes.push(routeFile)
-      }
-
-      // Also check if it's used with app.use()
-      const usageRegex = new RegExp(`app\\.use\\([^)]*${routeFile}`, 'i')
-      if (importRegex.test(indexContent) && !usageRegex.test(indexContent)) {
-        unmountedRoutes.push(`${routeFile} (imported but not mounted)`)
+      } else {
+        // Route is imported - check if the imported variable is used with app.use()
+        const importedVarName = importMatch[1]
+        const usageRegex = new RegExp(`app\\.use\\([^)]*${importedVarName}`, 'i')
+        if (!usageRegex.test(appContent)) {
+          unmountedRoutes.push(`${routeFile} (imported as ${importedVarName} but not mounted)`)
+        }
       }
     }
 
     const message = unmountedRoutes.length > 0
       ? `Found unmounted/orphaned route file(s): ${unmountedRoutes.join(', ')}\n\n` +
-        `Action: Either mount the route in index.ts with app.use(), or delete the route file.\n` +
+        `Action: Either mount the route in app.ts with app.use(), or delete the route file.\n` +
         `Reference: https://github.com/Blue-Kollar/Blue-Collar/issues/932`
       : ''
 
