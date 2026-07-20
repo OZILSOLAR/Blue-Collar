@@ -68,6 +68,7 @@ model User {
   jobMessagesReceived         JobMessage[]          @relation("JobMessagesReceived")
   refreshTokens               RefreshToken[]
   notificationPreferences     NotificationPreferences?
+  bookings                    Booking[]             @relation("BookingsRequester")
 }
 
 model Category {
@@ -122,6 +123,7 @@ model Worker {
   jobApplications     JobApplication[]
   profileViews        ProfileView[]
   analytics           WorkerAnalytics?
+  bookings            Booking[]
 }
 
 model Bookmark {
@@ -575,4 +577,31 @@ model NotificationPreferences {
   updatedAt         DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Booking / Scheduling ─────────────────────────────────────────────────────
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+  completed
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  workerId    String
+  requesterId String
+  startTime   DateTime
+  endTime     DateTime
+  status      BookingStatus @default(pending)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  worker      Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  requester   User          @relation("BookingsRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+  @@index([requesterId])
+  @@index([status])
 }
