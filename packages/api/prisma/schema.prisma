@@ -95,8 +95,8 @@ model User {
   /// Workers created by this user (audit trail — #833)
   workersCreated          Worker[]                  @relation("WorkerCreatedBy")
   /// Workers last updated by this user (audit trail — #833)
-  workersUpdated          Worker[]                  @relation("WorkerUpdatedBy")
-  bookings                Booking[]                 @relation("BookingRequester")
+  workersUpdated              Worker[]             @relation("WorkerUpdatedBy")
+  bookingsRequested           Booking[]            @relation("BookingRequester")
 
   @@index([email])
   @@index([role])
@@ -158,14 +158,14 @@ model Worker {
   disputes             Dispute[]
   interactions         UserInteraction[]
   verificationRequests VerificationRequest[]
-  insuranceDocuments   InsuranceDocument[]
-  portfolioItems       PortfolioItem[]
-  subscription         Subscription?
-  jobApplications      JobApplication[]
-  profileViews         ProfileView[]
-  analytics            WorkerAnalytics?
-  tipEvents            WorkerTipEvent[]
-  bookings             Booking[]
+  insuranceDocuments  InsuranceDocument[]
+  portfolioItems      PortfolioItem[]
+  subscription        Subscription?
+  jobApplications     JobApplication[]
+  profileViews        ProfileView[]
+  analytics           WorkerAnalytics?
+  bookings            Booking[]
+  tipEvents           WorkerTipEvent[]
 
   @@index([isActive, categoryId])
   @@index([curatorId])
