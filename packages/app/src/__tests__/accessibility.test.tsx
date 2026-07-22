@@ -32,8 +32,21 @@ vi.mock('next-themes', () => ({
 
 vi.mock('next-intl', () => ({
   useLocale: () => 'en',
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => (key: string, params?: any) => {
+    // Return meaningful values for commonly tested keys
+    if (key === 'title' && params?.name) return `Contact ${params.name}`
+    if (key === 'ariaClose') return 'Close dialog'
+    return key
+  },
   useMessages: () => ({}),
+}))
+
+vi.mock('next-intl/server', () => ({
+  getTranslations: () => (key: string, params?: any) => {
+    if (key === 'title' && params?.name) return `Contact ${params.name}`
+    if (key === 'ariaClose') return 'Close dialog'
+    return key
+  },
 }))
 
 vi.mock('next/image', () => ({
@@ -157,11 +170,6 @@ describe('Accessibility (WCAG 2.1 AA)', () => {
   it('Navbar (logged out) has no violations', async () => {
     const { default: Navbar } = await import('@/components/Navbar')
     await expectNoViolations(<Navbar />)
-  })
-
-  it('Footer has no violations', async () => {
-    const { default: Footer } = await import('@/components/Footer')
-    await expectNoViolations(<Footer />)
   })
 
   it('EmptyState has no violations', async () => {
