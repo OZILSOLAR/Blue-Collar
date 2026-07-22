@@ -96,6 +96,7 @@ model User {
   workersCreated              Worker[]             @relation("WorkerCreatedBy")
   /// Workers last updated by this user (audit trail — #833)
   workersUpdated              Worker[]             @relation("WorkerUpdatedBy")
+  bookingsRequested           Booking[]            @relation("BookingRequester")
 
   @@index([email])
   @@index([role])
@@ -164,6 +165,7 @@ model Worker {
   profileViews        ProfileView[]
   analytics           WorkerAnalytics?
   bookings            Booking[]
+  tipEvents           WorkerTipEvent[]
 
   @@index([isActive, categoryId])
   @@index([curatorId])
