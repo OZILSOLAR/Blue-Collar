@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLocale } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type { AuthUser } from "@/context/AuthContext";
@@ -12,6 +13,7 @@ const TOKEN_KEY = "bc_token";
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locale = useLocale();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +42,7 @@ export default function AuthCallbackPage() {
         const user = json.data as AuthUser;
         login(user, token);
         // Redirect to intended page or default
-        const redirect = sessionStorage.getItem("oauth_redirect") ?? "/workers";
+        const redirect = sessionStorage.getItem("oauth_redirect") ?? `/${locale}/workers`;
         sessionStorage.removeItem("oauth_redirect");
         router.replace(redirect);
       })
@@ -48,7 +50,7 @@ export default function AuthCallbackPage() {
         setError("Sign-in failed. Please try again.");
         localStorage.removeItem(TOKEN_KEY);
       });
-  }, [searchParams, login, router]);
+  }, [searchParams, login, router, locale]);
 
   if (error) {
     return (
@@ -56,7 +58,7 @@ export default function AuthCallbackPage() {
         <div className="w-full max-w-sm rounded-2xl border bg-white p-8 text-center shadow-sm">
           <p className="text-sm font-medium text-red-600">{error}</p>
           <a
-            href="/auth/login"
+            href={`/${locale}/auth/login`}
             className="mt-4 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             Back to Sign In
