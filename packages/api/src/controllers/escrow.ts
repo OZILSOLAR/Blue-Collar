@@ -32,7 +32,7 @@ export const createEscrow = catchAsync(async (req: Request, res: Response) => {
 export const activateEscrow = catchAsync(async (req: Request, res: Response) => {
   const { txId } = req.body
   if (!txId) return res.status(400).json({ status: 'error', message: 'txId is required', code: 400 })
-  const record = await escrowService.activateEscrow(req.params.id, txId)
+  const record = await escrowService.activateEscrow(req.params.id, txId, req.user!.id, req.user!.role)
   return res.json({ data: record, status: 'success', code: 200 })
 })
 

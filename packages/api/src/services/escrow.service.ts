@@ -46,11 +46,13 @@ export async function createEscrow(data: {
 
 /**
  * Activate an escrow (funds confirmed on-chain).
+ * Only the payer (or admin) should call this.
  */
-export async function activateEscrow(id: string, txId: string) {
+export async function activateEscrow(id: string, txId: string, callerId: string, callerRole: string) {
   const record = await db.escrowRecord.findUnique({ where: { id } })
   if (!record) throw new AppError('Escrow not found', 404)
   if (record.status !== 'pending') throw new AppError('Only pending escrows can be activated', 400)
+  if (callerRole !== 'admin' && record.payerId !== callerId) throw new AppError('Forbidden', 403)
 
   const updated = await db.escrowRecord.update({
     where: { id },
